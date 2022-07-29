@@ -1,0 +1,16 @@
+[package]
+name = "victors"
+version = "0.1.0"
+authors = ["seancarroll"]
+description = "A library for generating Graphviz DOT language files for graphs."
+edition = "2021"
+readme = "README.md"
+repository = "https://github.com/seancarroll/victors"
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.8.5"
+serde_json = "1.0"
+thiserror = "1"
