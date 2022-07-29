@@ -12,3 +12,4 @@ List of TODOS
 8. Publishing Results
 9. Parallel computation
 10. OTEL publisher - will probably go into a separate lib dedicated to publishers
+11. Should we just return serde json Value instead of a generic R from a behavior? It does need to technically be serializable so that it can be reported.

@@ -9,26 +9,36 @@ use crate::experiment::Experiment;
 //   # Rescues and reports exceptions in the clean block if they occur.
 
 /// What happened when this named behavior was executed? Immutable.
-// TODO: need to change value
 #[derive(Clone)]
 pub struct Observation<R: Clone>  {
-    pub experiment: Experiment<R>,
+    /// The experiment this observation is for
+    pub experiment_name: String,
+    /// name of the behavior
     pub name: String,
-    pub value: R, // what type should this be?
-    pub exception: String, // probably dont need this
-    pub duration: usize
+    pub value: R,
+    /// cleaned value suitable for publishing. See [Experiment::cleaner] block. None if no cleaner
+    pub cleaned_value: Option<R>, // what type should this be?
+    pub exception: Option<String>, // TODO: change to error
+    pub duration: u128
 }
 
 impl<R: Clone> Observation<R> {
 
     // TODO: pass in lambda/function block which is executed and duration/value returned
-    pub fn new(name: String, experiment: Experiment<R>, value: R) -> Self {
+    pub fn new(
+        name: String,
+        experiment_name: String,
+        value: R,
+        cleaned_value: Option<R>,
+        duration: u128
+    ) -> Self {
         return Self {
             name,
             value,
-            exception: String::from(""), // TODO: change to Error
-            experiment,
-            duration: 0
+            cleaned_value,
+            exception: None,
+            experiment_name,
+            duration
         }
     }
 

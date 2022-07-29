@@ -2,6 +2,7 @@
 // # If this is nil, raise_on_mismatches class attribute is used instead.
 // attr_accessor :raise_on_mismatches
 use std::collections::HashMap;
+use std::time::Instant;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use serde_json::Value;
@@ -25,6 +26,8 @@ static DEFAULT_EXPERIMENT_NAME: &str = "experiment";
 //     fn should_experiment_run(&self) -> bool;
 // }
 
+
+
 #[derive(Clone)]
 pub struct Experiment<R: Clone> {
     pub name: String,
@@ -32,7 +35,7 @@ pub struct Experiment<R: Clone> {
     behaviors: HashMap<String, fn() -> R>,
     pub run_if_block: Option<fn() -> bool>,
     pub before_run_block: Option<fn()>,
-    pub cleaner: Option<fn(String)>,
+    pub cleaner: Option<fn(R)>,
     pub enabled: fn() -> bool,
     context: HashMap<String, Value>
 }
@@ -122,7 +125,7 @@ impl<R: Clone> Experiment<R> {
 
     // A block to clean an observed value for publishing or storing.
     // The block takes one argument, the observed value which will be cleaned.
-    pub fn clean<F>(&mut self, f: fn(String)) {
+    pub fn clean(&mut self, f: fn(R)) {
         self.cleaner = Some(f)
     }
 
@@ -131,24 +134,49 @@ impl<R: Clone> Experiment<R> {
     //
     // }
 
-    fn generate_result(&self, name: String) -> ExperimentResult<R> {
-        let mut observations: Vec<Observation<R>> = vec![];
+    fn generate_result(&self, name: String) -> VictorsResult<ExperimentResult<R>> {
+        let mut candidate_observations: Vec<Observation<R>> = vec![];
+        let mut observation_to_return = None;
 
         // TODO: better way to get keys and shuffle?
         let mut keys = Vec::from_iter(self.behaviors.keys().cloned());
         keys.shuffle(&mut thread_rng());
         for key in keys {
-            println!("found behavior...{}", key);
             let behavior = self.behaviors.get(&key);
             if let Some(behavior) = behavior {
+                let start = Instant::now();
                 let behavior_results = behavior();
-                observations.push(Observation::new(
-                    key,
-                    self.clone(),
-                    behavior_results
-                ));
+                let duration = start.elapsed();
+                // TODO: need to clean value at some point
+                let observation = Observation::new(
+                    key.to_string(),
+                    self.name.to_string(),
+                    behavior_results,
+                    None,
+                    duration.as_millis()
+                );
+                if key == name {
+                    observation_to_return = Some(observation);
+                } else {
+                    candidate_observations.push(observation);
+                }
             }
+        }
 
+        match observation_to_return {
+            None => {
+                Err(VictorsErrors::BehaviorMissing {
+                    experiment_name: self.name.to_string(),
+                    name
+                })
+            }
+            Some(o) => {
+                Ok(ExperimentResult::new(
+                    self,
+                    candidate_observations,
+                    o
+                ))
+            }
         }
 
         // TODO: get control
@@ -158,14 +186,14 @@ impl<R: Clone> Experiment<R> {
 
 
         // TODO: change to ?
-        let c = observations.iter().find(|o| o.name == name)
-            .expect("should find name in observations");
+        // let c = observations.into_iter().find(|o| o.name == name)
+        //     .expect("should find name in observations");
         // TODO: can we change this to avoid the clones?
-        return ExperimentResult::new(
-            self.clone(),
-            vec![],
-            (*c).clone()
-        );
+        // return Ok(ExperimentResult::new(
+        //     self,
+        //     candidate_observations,
+        //     observation_to_return.
+        // ));
     }
 
     pub fn add_context(&mut self, context: HashMap<String, Value>) {
@@ -181,7 +209,7 @@ impl<R: Clone> Experiment<R> {
     }
 
     // Don't publish anything.
-    fn publish(&self) {}
+    fn publish(&self, result: &ExperimentResult<R>) {}
 
     // TODO: run needs to return a generic result
 
@@ -217,8 +245,8 @@ impl<R: Clone> Experiment<R> {
             before_block()
         }
 
-        let result = self.generate_result(name.to_string());
-
+        let result = self.generate_result(name.to_string())?;
+        self.publish(&result);
         // begin
         //     publish(result)
         // rescue StandardError => ex
@@ -245,183 +273,85 @@ impl<R: Clone> Experiment<R> {
     }
 }
 
-// A null experiment.
-// pub struct DefaultExperiment {
-//     pub name: String,
-//     pub behaviors: HashMap<String, fn()>,
-//     pub run_if_block: Option<fn() -> bool>,
-//     pub before_run_block: Option<fn()>,
-//     pub cleaner: Option<fn(String)>,
-// }
-//
-// impl DefaultExperiment {
-//     fn run_if_block_allows(&self) -> bool {
-//         match &self.run_if_block {
-//             None => true,
-//             Some(block) => block(),
-//         }
-//     }
-//
-//     // Register a named behavior for this experiment, default "candidate".
-//     pub fn candidate(&mut self, name: &str, f: fn()) -> VictorsResult<()> {
-//         self.add_behavior(name, f)
-//     }
-//
-//     // Register the control behavior for this experiment.
-//     pub fn control(&mut self, f: fn()) -> VictorsResult<()> {
-//         self.add_behavior("control", f)
-//     }
-//
-//     fn add_behavior(&mut self, name: &str, f: fn()) -> VictorsResult<()> {
-//         if self.behaviors.contains_key(name) {
-//             return Err(VictorsErrors::BehaviorNotUnique {
-//                 experiment_name: (*&self.name).to_string(),
-//                 name: name.to_string(),
-//             });
-//         }
-//
-//         self.behaviors.insert(name.to_string(), f);
-//
-//         return Ok(());
-//     }
-//
-//     // Define a block of code to run before an experiment begins, if the experiment is enabled.
-//     pub fn before_run(&mut self, f: fn()) {
-//         self.before_run_block = Some(f)
-//     }
-//
-//     // # A block to clean an observed value for publishing or storing.
-//     // #
-//     // # The block takes one argument, the observed value which will be cleaned.
-//     // #
-//     // # Returns the configured block.
-//     // def clean(&block)
-//     // @_scientist_cleaner = block
-//     // end
-//
-//     // A block to clean an observed value for publishing or storing.
-//     // The block takes one argument, the observed value which will be cleaned.
-//     pub fn clean<F>(&mut self, f: fn(String)) {
-//         self.cleaner = Some(f)
-//     }
-//
-//
-//     // fn raise_on_mismatch(&self) -> bool {
-//     //
-//     // }
-//
-//     fn generate_result(&self, name: String) {
-//         let observations: Vec<Observation> = vec![];
-//
-//         // TODO: better way to get keys and shuffle?
-//         let mut keys = Vec::from_iter(self.behaviors.keys().cloned());
-//         keys.shuffle(&mut thread_rng());
-//         for key in keys {
-//             let behavior = self.behaviors.get(&key);
-//         }
-//
-//     }
-// }
+pub struct UncontrolledExperiment<R: Clone> {
+    experiment: Experiment<R>
+}
 
-// impl Experiment for DefaultExperiment {
-//     // Don't run experiments.
-//     fn is_enabled(&self) -> bool {
-//         return false;
-//     }
-//
-//     // Don't publish anything.
-//     fn publish(&self) {}
-//
-//     fn run(&self, name: Option<&str>) -> VictorsResult<()> {
-//         let name = if let Some(name) = name { name } else { "control" };
-//
-//         let block = self.behaviors.get(name);
-//         if block.is_none() {
-//             return Err(VictorsErrors::BehaviorMissing {
-//                 experiment_name: (*&self.name).to_string(),
-//                 name: "name".to_string(),
-//             });
-//         }
-//
-//         if let Some(before_block) = &self.before_run_block {
-//             before_block()
-//         }
-//
-//         // result = generate_result(name)
-//
-//         // begin
-//         //     publish(result)
-//         // rescue StandardError => ex
-//         //     raised :publish, ex
-//         // end
-//
-//         // if raise_on_mismatches? && result.mismatched?
-//         //     if @_scientist_custom_mismatch_error
-//         //         raise @_scientist_custom_mismatch_error.new(self.name, result)
-//         //     else
-//         //         raise MismatchError.new(self.name, result)
-//         //     end
-//         // end
-//         //
-//         // control = result.control
-//         // raise control.exception if control.raised?
-//         // control.value
-//
-//         return Ok(());
-//     }
-//
-//     fn should_experiment_run(&self) -> bool {
-//         return self.behaviors.len() > 1 && self.is_enabled() && self.run_if_block_allows();
-//     }
-//
-// }
+impl<R: Clone> UncontrolledExperiment<R> {
 
-// # A mismatch, raised when raise_on_mismatches is enabled.
-//   class MismatchError < Exception
-//     attr_reader :name, :result
+    /// Creates a new experiment with the name "experiment"
+    pub fn default() -> Self {
+        return Self {
+            experiment: Experiment::default()
+        }
+    }
 
-//     def initialize(name, result)
-//       @name   = name
-//       @result = result
-//       super "experiment '#{name}' observations mismatched"
-//     end
+    /// Creates a new experiment
+    ///
+    /// # Arguments
+    /// * `name` - the name of the experiment
+    pub fn new(name: &'static str) -> Self {
+        return Self {
+            experiment: Experiment::new(name)
+        }
+    }
 
-//     # The default formatting is nearly unreadable, so make it useful.
-//     #
-//     # The assumption here is that errors raised in a test environment are
-//     # printed out as strings, rather than using #inspect.
-//     def to_s
-//       super + ":\n" +
-//       format_observation(result.control) + "\n" +
-//       result.candidates.map { |candidate| format_observation(candidate) }.join("\n") +
-//       "\n"
-//     end
+    /// Creates a new experiment with initial context
+    ///
+    /// # Arguments
+    /// * `name` - the name of the experiment
+    /// * `context` - Map of extra experiment data
+    pub fn new_with_context(name: &'static str, context: HashMap<String, Value>) -> Self {
+        return Self {
+            experiment: Experiment::new_with_context(name, context)
+        }
+    }
 
-//     def format_observation(observation)
-//       observation.name + ":\n" +
-//       if observation.raised?
-//         lines = observation.exception.backtrace.map { |line| "    #{line}" }.join("\n")
-//         "  #{observation.exception.inspect}" + "\n" + lines
-//       else
-//         "  #{observation.cleaned_value.inspect}"
-//       end
-//     end
-//   end
+    fn run_if_block_allows(&self) -> bool {
+        self.experiment.run_if_block_allows()
+    }
 
-//   module RaiseOnMismatch
-//     # Set this flag to raise on experiment mismatches.
-//     #
-//     # This causes all science mismatches to raise a MismatchError. This is
-//     # intended for test environments and should not be enabled in a production
-//     # environment.
-//     #
-//     # bool - true/false - whether to raise when the control and candidate mismatch.
-//     def raise_on_mismatches=(bool)
-//       @raise_on_mismatches = bool
-//     end
+    // Register a named behavior for this experiment, default "candidate".
+    pub fn candidate(&mut self, name: &str, f: fn() -> R) -> VictorsResult<()> {
+        self.experiment.candidate(name, f)
+    }
 
-//     # Whether or not to raise a mismatch error when a mismatch occurs.
-//     def raise_on_mismatches?
-//       @raise_on_mismatches
-//     end
-//   end
+    // Define a block of code to run before an experiment begins, if the experiment is enabled.
+    pub fn before_run(&mut self, f: fn()) {
+        self.experiment.before_run(f)
+    }
+
+    // A block to clean an observed value for publishing or storing.
+    // The block takes one argument, the observed value which will be cleaned.
+    pub fn clean(&mut self, f: fn(R)) {
+        self.experiment.clean(f)
+    }
+
+    pub fn add_context(&mut self, context: HashMap<String, Value>) {
+        self.experiment.add_context(context)
+    }
+
+    fn enabled(&mut self, enabled: fn() -> bool) {
+        self.experiment.enabled(enabled)
+    }
+
+    fn is_enabled(&self) -> bool {
+        return (self.experiment.enabled)();
+    }
+
+    fn publish(&self, result: &ExperimentResult<R>) {
+        self.experiment.publish(result)
+    }
+
+
+    /// Run all the behaviors for this experiment, observing each and publishing the results.
+    /// Return the result of the named candidate
+    /// See [Experiment::internal_run]
+    pub fn run(&self, name: &'static str) -> VictorsResult<R> {
+        return self.experiment.internal_run(name);
+    }
+
+    fn should_experiment_run(&self) -> bool {
+        return self.experiment.should_experiment_run();
+    }
+}

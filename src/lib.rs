@@ -63,6 +63,20 @@ mod tests {
     }
 
     #[test]
+    fn should_be_able_to_create_and_run_uncontrolled_experiment_via_victor() {
+        let r = Victor::conduct_uncontrolled("conduct test", "second", |experiment| {
+            // To fix the error below means we need to return Ok(()) at the end
+            // cannot use the `?` operator in a closure that returns `()`
+            // I dont love it but I suppose thats part of the rust idioms
+            experiment.candidate("first", || { 1 })?;
+            experiment.candidate("second", || { 2 })?;
+            Ok(())
+        });
+
+        assert_eq!(Some(2), r.ok());
+    }
+
+    #[test]
     fn should_return_non_unique_error_when_multiple_candidates_are_registered_with_same_name() {
         let mut experiment = Experiment::default();
         experiment.control(|| { println!("control...")}).expect("control shouldnt fail");

@@ -22,6 +22,7 @@ pub enum VictorsErrors {
     #[error("{experiment_name} already has {name} behavior")]
     BehaviorNotUnique { experiment_name: String, name: String },
 
+    // TODO: see if this is needed. looks like scientist doesnt use it anywhere
     #[error("{observation_name} didn't return a value")]
     NoValue {observation_name: String},
 }

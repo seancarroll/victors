@@ -2,18 +2,18 @@ use crate::experiment::Experiment;
 use crate::observation::Observation;
 
 /// The immutable result of running an experiment.
-pub struct ExperimentResult<R: Clone> {
+pub struct ExperimentResult<'a, R: Clone> {
     pub candidates: Vec<Observation<R>>,
     pub control: Observation<R>,
     // pub experiment: &'a dyn Experiment,
-    pub experiment: Experiment<R>,
+    pub experiment: &'a Experiment<R>,
     pub ignored: Vec<Observation<R>>,
     pub mismatched: Vec<Observation<R>>,
     pub observations: Vec<Observation<R>>,
 }
 
-impl<R: Clone> ExperimentResult<R> {
-    pub fn new(experiment: Experiment<R>, observations: Vec<Observation<R>>, control: Observation<R>) -> Self {
+impl<'a, R: Clone> ExperimentResult<'a, R> {
+    pub fn new(experiment: &'a Experiment<R>, observations: Vec<Observation<R>>, control: Observation<R>) -> Self {
         // evaluate_candidates();
         let result = Self {
             candidates: vec![],
