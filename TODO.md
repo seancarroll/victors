@@ -11,3 +11,4 @@ List of TODOS
 7. Comparing values
 8. Publishing Results
 9. Parallel computation
+10. OTEL publisher - will probably go into a separate lib dedicated to publishers

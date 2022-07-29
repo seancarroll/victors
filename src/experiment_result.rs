@@ -1,7 +1,7 @@
 use crate::experiment::Experiment;
 use crate::observation::Observation;
 
-// The immutable result of running an experiment.
+/// The immutable result of running an experiment.
 pub struct ExperimentResult<R: Clone> {
     pub candidates: Vec<Observation<R>>,
     pub control: Observation<R>,

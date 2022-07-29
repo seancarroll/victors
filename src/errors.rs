@@ -3,7 +3,7 @@ use thiserror::Error;
 pub type VictorsResult<T> = Result<T, VictorsErrors>;
 
 #[non_exhaustive]
-#[derive(Error, Debug, PartialEq)]
+#[derive(Debug, Error, PartialEq)]
 pub enum VictorsErrors {
 
     // TODO: I might want to have actual experiment to be part of enum variants but in order to

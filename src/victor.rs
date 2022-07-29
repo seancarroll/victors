@@ -8,14 +8,9 @@
 use crate::errors::VictorsResult;
 use crate::experiment::Experiment;
 
-// Creating an experiment is wordy, but when you include the Scientist module, the science helper
-// will instantiate an experiment and call run for you:
-// science "widget-permissions" do |experiment|
-//    experiment.use { model.check_user(user).valid? } # old way
-//    experiment.try { user.can?(:read, model) } # new way
-// end # returns the control value
 pub struct Victor;
 
+/// Helper that will instantiate and experiment and call run for you
 impl Victor {
 
     /// Define and run an experiment.

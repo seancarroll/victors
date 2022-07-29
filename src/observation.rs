@@ -38,11 +38,3 @@ impl<R: Clone> Observation<R> {
 
     // TODO: equivalent_to fn
 }
-
-// impl<T> Copy for Foo<T> {}
-
-// impl<R> Clone for Observation<R> {
-//     fn clone(&self) -> Self {
-//         *self
-//     }
-// }

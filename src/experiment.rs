@@ -10,7 +10,7 @@ use crate::experiment_result::ExperimentResult;
 use crate::observation::Observation;
 
 
-static DEFAULT_CONTROL_NAME: &str = "control";
+static CONTROL_NAME: &str = "control";
 static DEFAULT_CANDIDATE_NAME: &str = "candidate";
 static DEFAULT_EXPERIMENT_NAME: &str = "experiment";
 
@@ -60,6 +60,11 @@ impl<R: Clone> Experiment<R> {
         }
     }
 
+    /// Creates a new experiment with initial context
+    ///
+    /// # Arguments
+    /// * `name` - the name of the experiment
+    /// * `context` - Map of extra experiment data
     pub fn new_with_context(name: &'static str, context: HashMap<String, Value>) -> Self {
         return Self {
             name: name.to_string(),
@@ -194,7 +199,7 @@ impl<R: Clone> Experiment<R> {
     /// Return the result of the control
     /// See [internal_run]
     pub fn run(&self) -> VictorsResult<R> {
-        return self.internal_run(DEFAULT_CONTROL_NAME);
+        return self.internal_run(CONTROL_NAME);
     }
 
     /// Run all the behaviors for this experiment, observing each and publishing the results.
