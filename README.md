@@ -1,5 +1,8 @@
 # victors
 
+![build](https://github.com/seancarroll/victors/actions/workflows/CI.yml/badge.svg)
+
+
 Victor's experiments allow for carefully refactoring critical paths.
 
 This library is inspired by the ruby gem [scientist](https://github.com/github/scientist).
@@ -78,5 +81,5 @@ TODO:
 
 Like a lot of the names I choose this is named after Victor Von Doom who is considered one of the most brilliant minds and scientists on the planet Earth.
 
-> I, who have mastered all arts, all sciences,...
+> I, who have mastered all arts, all sciences,...  
 > -- <cite>Doctor Doom</cite>
