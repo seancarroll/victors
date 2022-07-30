@@ -1,6 +1,7 @@
 #![doc(html_root_url = "https://docs.rs/victors")]
 #![doc(issue_tracker_base_url = "https://github.com/seancarroll/victors/issues/")]
 #![cfg_attr(docsrs, deny(broken_intra_doc_links))]
+#![feature(backtrace)]
 
 mod errors;
 mod experiment;
@@ -11,7 +12,7 @@ mod result_publisher;
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::{VictorsErrors, VictorsResult};
+    use crate::errors::{BehaviorNotUnique, VictorsErrors, VictorsResult};
     use crate::experiment::Experiment;
     use crate::victor::Victor;
 
@@ -82,7 +83,10 @@ mod tests {
         experiment.control(|| { println!("control...")}).expect("control shouldnt fail");
         experiment.candidate("candidate", || { println!("candidate...") }).expect("candidate shouldnt fail");
         let result = experiment.candidate("candidate", || { println!("second candidate...") });
-        let expected = VictorsErrors::BehaviorNotUnique { experiment_name: "experiment".to_string(), name: "candidate".to_string() };
+        let expected = VictorsErrors::BehaviorNotUnique(BehaviorNotUnique {
+            experiment_name: "experiment".to_string(),
+            name: "candidate".to_string()
+        });
         assert_eq!(expected, result.unwrap_err());
     }
 }

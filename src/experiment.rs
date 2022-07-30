@@ -6,7 +6,7 @@ use std::time::Instant;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use serde_json::Value;
-use crate::errors::{VictorsErrors, VictorsResult};
+use crate::errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult};
 use crate::experiment_result::ExperimentResult;
 use crate::observation::Observation;
 
@@ -99,10 +99,10 @@ impl<R: Clone> Experiment<R> {
 
     fn add_behavior(&mut self, name: &str, f: fn() -> R) -> VictorsResult<()> {
         if self.behaviors.contains_key(name) {
-            return Err(VictorsErrors::BehaviorNotUnique {
+            return Err(VictorsErrors::BehaviorNotUnique(BehaviorNotUnique {
                 experiment_name: (*&self.name).to_string(),
                 name: name.to_string(),
-            });
+            }));
         }
         self.behaviors.insert(name.to_string(), f);
 
@@ -165,10 +165,10 @@ impl<R: Clone> Experiment<R> {
 
         match observation_to_return {
             None => {
-                Err(VictorsErrors::BehaviorMissing {
+                Err(VictorsErrors::BehaviorMissing(BehaviorMissing {
                     experiment_name: self.name.to_string(),
                     name
-                })
+                }))
             }
             Some(o) => {
                 Ok(ExperimentResult::new(
@@ -235,10 +235,10 @@ impl<R: Clone> Experiment<R> {
     pub(crate) fn internal_run(&self, name: &str) -> VictorsResult<R> {
         let block = self.behaviors.get(name);
         if block.is_none() {
-            return Err(VictorsErrors::BehaviorMissing {
+            return Err(VictorsErrors::BehaviorMissing(BehaviorMissing {
                 experiment_name: (*&self.name).to_string(),
                 name: name.to_string(),
-            });
+            }));
         }
 
         if let Some(before_block) = &self.before_run_block {

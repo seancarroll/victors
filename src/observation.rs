@@ -17,7 +17,7 @@ pub struct Observation<R: Clone>  {
     pub name: String,
     pub value: R,
     /// cleaned value suitable for publishing. See [Experiment::cleaner] block. None if no cleaner
-    pub cleaned_value: Option<R>, // what type should this be?
+    pub cleaned_value: Option<R>, // TODO: what type should this be?
     pub exception: Option<String>, // TODO: change to error
     pub duration: u128
 }
