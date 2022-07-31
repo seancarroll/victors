@@ -26,10 +26,10 @@ pub struct BehaviorNotUnique {
 
 #[derive(Debug)]
 pub struct MismatchError {
-    experiment_name: String,
-    exception: String, // the associated class....not sure we need this,
-    message: String,
-    backtrace: Backtrace,
+    pub experiment_name: String,
+    pub exception: Option<String>, // the associated class....not sure we need this,
+    pub message: String, // TODO: probably dont need this.
+    pub backtrace: Option<Backtrace>,
 }
 
 #[non_exhaustive]

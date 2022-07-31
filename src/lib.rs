@@ -89,4 +89,13 @@ mod tests {
         });
         assert_eq!(expected, result.unwrap_err());
     }
+
+
+    // ignore ignore_mismatched_observation tests
+    // TODO: does not ignore an observation if no ignores are configured
+    // TODO: calls a configured ignore block with the given observed values
+    // TODO: calls multiple ignore blocks to see if any match
+    // TODO: only calls ignore blocks until one matches
+    // TODO: reports exceptions raised in an ignore block and returns false
+    // TODO: skips ignore blocks that raise and tests any remaining blocks if an exception is swallowed
 }

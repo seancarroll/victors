@@ -2,7 +2,6 @@
 
 ![build](https://github.com/seancarroll/victors/actions/workflows/CI.yml/badge.svg)
 
-
 Victor's experiments allow for carefully refactoring critical paths.
 
 This library is inspired by the ruby gem [scientist](https://github.com/github/scientist).

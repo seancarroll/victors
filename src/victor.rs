@@ -14,7 +14,7 @@ impl Victor {
     ///
     /// # Return
     /// Returns the calculated value of the control experiment or error
-    pub fn conduct<F, R: Clone>(name: &'static str, experiment_block: F) -> VictorsResult<R>
+    pub fn conduct<F, R: Clone + PartialEq>(name: &'static str, experiment_block: F) -> VictorsResult<R>
         where
             F: Fn(&mut Experiment<R>) -> VictorsResult<()>
     {
@@ -33,7 +33,7 @@ impl Victor {
     ///
     /// # Return
     /// Returns the calculated value of the named experiment or error
-    pub fn conduct_uncontrolled<F, R: Clone>(
+    pub fn conduct_uncontrolled<F, R: Clone + PartialEq>(
         name: &'static str,
         return_candidate_result: &'static str,
         experiment_block: F

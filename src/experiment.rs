@@ -6,7 +6,7 @@ use std::time::Instant;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use serde_json::Value;
-use crate::errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult};
+use crate::errors::{BehaviorMissing, BehaviorNotUnique, MismatchError, VictorsErrors, VictorsResult};
 use crate::experiment_result::ExperimentResult;
 use crate::observation::Observation;
 
@@ -27,9 +27,13 @@ static DEFAULT_EXPERIMENT_NAME: &str = "experiment";
 // }
 
 
+// TODO: do we want to rename Experiment to ControlledExperiment
+// Then make Experiment a trait (or Experimentation).
+
+// TODO: make type alias for these various fn blocks
 
 #[derive(Clone)]
-pub struct Experiment<R: Clone> {
+pub struct Experiment<R: Clone + PartialEq> {
     pub name: String,
     // TODO: separate out control and then have map of candidates
     behaviors: HashMap<String, fn() -> R>,
@@ -37,10 +41,14 @@ pub struct Experiment<R: Clone> {
     pub before_run_block: Option<fn()>,
     pub cleaner: Option<fn(R)>,
     pub enabled: fn() -> bool,
-    context: HashMap<String, Value>
+    context: HashMap<String, Value>,
+    ignores: Vec<fn(&Observation<R>, &Observation<R>) -> bool>, // TODO: might need to return Result<bool>
+    pub err_on_mismatches: bool,
+    comparator: Option<fn(a: &R, b: &R) -> bool>,
+    error_comparator: Option<fn(a: &VictorsErrors, b: &VictorsErrors) -> bool>
 }
 
-impl<R: Clone> Experiment<R> {
+impl<R: Clone + PartialEq> Experiment<R> {
 
     /// Creates a new experiment with the name "experiment"
     pub fn default() -> Self {
@@ -59,7 +67,11 @@ impl<R: Clone> Experiment<R> {
             before_run_block: None,
             cleaner: None,
             enabled: || { true },
-            context: Default::default()
+            context: Default::default(),
+            ignores: vec![],
+            err_on_mismatches: false,
+            comparator: None,
+            error_comparator: None
         }
     }
 
@@ -76,7 +88,11 @@ impl<R: Clone> Experiment<R> {
             before_run_block: None,
             cleaner: None,
             enabled: || { true },
-            context
+            context,
+            ignores: vec![],
+            err_on_mismatches: false,
+            comparator: None,
+            error_comparator: None
         }
     }
 
@@ -135,14 +151,14 @@ impl<R: Clone> Experiment<R> {
     // }
 
     fn generate_result(&self, name: String) -> VictorsResult<ExperimentResult<R>> {
-        let mut candidate_observations: Vec<Observation<R>> = vec![];
-        let mut observation_to_return = None;
+        let mut observations = vec![];
+        let mut observation_to_return_index = None;
 
         // TODO: better way to get keys and shuffle?
         let mut keys = Vec::from_iter(self.behaviors.keys().cloned());
         keys.shuffle(&mut thread_rng());
-        for key in keys {
-            let behavior = self.behaviors.get(&key);
+        for (i, key) in keys.iter().enumerate() {
+            let behavior = self.behaviors.get(key);
             if let Some(behavior) = behavior {
                 let start = Instant::now();
                 let behavior_results = behavior();
@@ -155,15 +171,15 @@ impl<R: Clone> Experiment<R> {
                     None,
                     duration.as_millis()
                 );
-                if key == name {
-                    observation_to_return = Some(observation);
-                } else {
-                    candidate_observations.push(observation);
+
+                observations.push(observation);
+                if key == &name {
+                    observation_to_return_index = Some(i);
                 }
             }
         }
 
-        match observation_to_return {
+        match observation_to_return_index {
             None => {
                 Err(VictorsErrors::BehaviorMissing(BehaviorMissing {
                     experiment_name: self.name.to_string(),
@@ -172,8 +188,8 @@ impl<R: Clone> Experiment<R> {
             }
             Some(o) => {
                 Ok(ExperimentResult::new(
-                    self,
-                    candidate_observations,
+                    &self,
+                    observations,
                     o
                 ))
             }
@@ -198,6 +214,45 @@ impl<R: Clone> Experiment<R> {
 
     pub fn add_context(&mut self, context: HashMap<String, Value>) {
         self.context.extend(context);
+    }
+
+    /// Configure experiment to ignore observations based on the given block.
+    ///
+    /// # Arguments
+    /// * `ignore_block` - Function takes two arguments, the control observation an the candidate
+    ///                    observation which didn't match the control. If the block returns true the
+    ///                    mismatch is disregarded.
+    pub fn add_ignore(&mut self, ignore_block: fn(&Observation<R>, &Observation<R>) -> bool) {
+        self.ignores.push(ignore_block)
+    }
+
+    /// Ignore a mismatched observation
+    ///
+    /// Iterates through the configured ignore blocks and calls each of them with the given
+    /// control and mismatched candidate observations.
+    ///
+    /// # Arguments
+    /// * `control` - the control observation
+    /// * `candidate` - the candidate observation
+    ///
+    /// # Return
+    /// whether or not to ignore mismatch observation
+    pub fn ignore_mismatch_observation(
+        &self,
+        control: &Observation<R>,
+        candidate: &Observation<R>
+    ) -> bool {
+        if self.ignores.is_empty() {
+            return false;
+        }
+
+        return self.ignores.iter().any(|ignore| ignore(&control, &candidate));
+    }
+
+    // TODO: does this need to return a result?
+    pub fn observations_are_equivalent(&self, a: &Observation<R>, b: &Observation<R>) -> bool {
+        // a.equivalent_to(b, self.comparator, self.error_comparator)
+        return false;
     }
 
     fn enabled(&mut self, enabled: fn() -> bool) {
@@ -246,38 +301,67 @@ impl<R: Clone> Experiment<R> {
         }
 
         let result = self.generate_result(name.to_string())?;
+        // TODO: this should return a VictorsError<()> to handle
+        // ruby version has a `raised` fn that takes in operation and error and allows users to
+        // customize behavior. Default behavior is to re-raise the exception
         self.publish(&result);
-        // begin
-        //     publish(result)
-        // rescue StandardError => ex
-        //     raised :publish, ex
-        // end
 
-        // if raise_on_mismatches? && result.mismatched?
-        //     if @_scientist_custom_mismatch_error
-        //         raise @_scientist_custom_mismatch_error.new(self.name, result)
-        //     else
-        //         raise MismatchError.new(self.name, result)
-        //     end
-        // end
-        //
-        // control = result.control
-        // raise control.exception if control.raised?
-        // control.value
+        if self.err_on_mismatches && result.matched() {
+            // TODO: do we want to support custom mismatch error?
+            // ruby version has a `raise_with` fn that sets `@_scientist_custom_mismatch_error`
+            // to allow for a custom err to be raised
+            return Err(VictorsErrors::MismatchError(MismatchError {
+                experiment_name: self.name.to_string(),
+                exception: None,
+                message: "".to_string(),
+                backtrace: None
+            }));
+        }
 
-        return Ok(result.control.value);
+        // if let Some(err) = &result.control.exception {
+        //     todo!()
+        // } else {
+        //     return Ok(result.control.value.to_owned());
+        // }
+
+        // TODO: fix unwrap
+        return Ok(result.control().unwrap().value.to_owned());
     }
 
     fn should_experiment_run(&self) -> bool {
         return self.behaviors.len() > 1 && self.is_enabled() && self.run_if_block_allows();
     }
+
+    /// Whether to return an error when the control and candidate mismatch.
+    fn err_on_mismatches(&mut self, err_on_mismatches: bool) {
+        self.err_on_mismatches = err_on_mismatches;
+    }
+
+    /// A block which compares two experimental values.
+    ///
+    /// # Arguments
+    /// * `comparator` - The block must take two arguments, the control value and a candidate value,
+    ///                  and return true or false.
+    pub fn comparator(&mut self, comparator: fn(&R, b: &R) -> bool) {
+        self.comparator = Some(comparator);
+    }
+
+    /// A block which compares two experimental errors.
+    ///
+    /// # Arguments
+    /// * `comparator` - The block must take two arguments, the control error and a candidate error,
+    ///                  and return true or false.
+    pub fn error_comparator(&mut self, comparator: fn(&VictorsErrors, b: &VictorsErrors) -> bool) {
+        self.error_comparator = Some(comparator);
+    }
+
 }
 
-pub struct UncontrolledExperiment<R: Clone> {
+pub struct UncontrolledExperiment<R: Clone + PartialEq> {
     experiment: Experiment<R>
 }
 
-impl<R: Clone> UncontrolledExperiment<R> {
+impl<R: Clone + PartialEq> UncontrolledExperiment<R> {
 
     /// Creates a new experiment with the name "experiment"
     pub fn default() -> Self {
@@ -331,6 +415,25 @@ impl<R: Clone> UncontrolledExperiment<R> {
         self.experiment.add_context(context)
     }
 
+    /// Configure experiment to ignore observations based on the given block.
+    ///
+    /// # Arguments
+    /// * `ignore_block` - Function takes two arguments, the control observation an the candidate
+    ///                    observation which didn't match the control. If the block returns true the
+    ///                    mismatch is disregarded.
+    pub fn add_ignore(&mut self, ignore_block: fn(&Observation<R>, &Observation<R>) -> bool) {
+        self.experiment.add_ignore(ignore_block)
+    }
+
+    /// See [Experiment::ignore_mismatch_observation]
+    pub fn ignore_mismatch_observation(
+        &self,
+        control: &Observation<R>,
+        candidate: &Observation<R>
+    ) -> bool {
+        self.experiment.ignore_mismatch_observation(control, candidate)
+    }
+
     fn enabled(&mut self, enabled: fn() -> bool) {
         self.experiment.enabled(enabled)
     }
@@ -353,5 +456,14 @@ impl<R: Clone> UncontrolledExperiment<R> {
 
     fn should_experiment_run(&self) -> bool {
         return self.experiment.should_experiment_run();
+    }
+
+    pub fn observations_are_equivalent(&self, a: &Observation<R>, b: &Observation<R>) -> bool {
+        return self.experiment.observations_are_equivalent(a, b);
+    }
+
+    /// Whether to return an error when the control and candidate mismatch.
+    fn err_on_mismatches(&mut self, err_on_mismatches: bool) {
+        self.experiment.err_on_mismatches(err_on_mismatches);
     }
 }
