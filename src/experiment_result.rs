@@ -1,32 +1,19 @@
+use std::collections::HashMap;
+use serde_json::Value;
 use crate::experiment::Experiment;
 use crate::observation::Observation;
 
-// # Internal: Create a new result.
-// #
-// # experiment    - the Experiment this result is for
-// # observations: - an Array of Observations, in execution order
-// # control:      - the control Observation
-// #
-// def initialize(experiment, observations = [], control = nil)
-// @experiment   = experiment
-// @observations = observations
-// @control      = control
-// @candidates   = observations - [control]
-// evaluate_candidates
-//
-// freeze
-// end
-
-
-
 // TODO: given this should be immutable remove pub from fields
 /// The immutable result of running an experiment.
-pub struct ExperimentResult<'a, R: Clone + PartialEq> {
+#[derive(Clone, PartialEq)]
+pub struct ExperimentResult<R: Clone + PartialEq> {
     // pub experiment: &'a dyn Experiment,
     // TODO: ugh...this would need to change in order to use controlled/uncontrolled
     // could be a trait object I suppose and see how well that works
-    pub experiment: &'a Experiment<R>,
+    // pub experiment: &'a Experiment<R>,
+    pub experiment_name: String,
     pub observations: Vec<Observation<R>>,
+    pub context: HashMap<String, Value>,
     // pub candidates: Vec<Observation<R>>,
     // pub control: &'a Observation<R>,
     // TODO: I dont love using "control" here as its abusing the name for uncontrolled experiments
@@ -39,7 +26,7 @@ pub struct ExperimentResult<'a, R: Clone + PartialEq> {
     ignored_indexes: Vec<usize>
 }
 
-impl<'a, R: Clone + PartialEq> ExperimentResult<'a, R> {
+impl<'a, R: Clone + PartialEq> ExperimentResult<R> {
     // pub fn new(
     //     experiment: &'a Experiment<R>,
     //     observations: Vec<Observation<R>>,
@@ -58,6 +45,12 @@ impl<'a, R: Clone + PartialEq> ExperimentResult<'a, R> {
     //     }
     // }
 
+    /// Create a new experiment result
+    ///
+    /// # Arguments
+    /// * `experiment`
+    /// * `observations`
+    /// * `control_index`
     pub fn new(
         experiment: &'a Experiment<R>,
         observations: Vec<Observation<R>>,
@@ -67,18 +60,22 @@ impl<'a, R: Clone + PartialEq> ExperimentResult<'a, R> {
             = ExperimentResult::evaluate_candidates(experiment, &observations, control_index);
 
         Self {
-            experiment,
+            experiment_name: experiment.name.to_string(),
             observations,
+            context: experiment.context.clone(),
             control_index,
             mismatched_indexes,
             ignored_indexes,
         }
     }
 
+    // TODO: rename as i dont like "control"
+    /// Returns the control observation
     pub fn control(&self) -> Option<&Observation<R>> {
         return self.observations.get(self.control_index);
     }
 
+    /// Return mismatched observations
     pub fn mismatched(&self) -> Vec<&Observation<R>> {
         let mut mismatched = vec![];
         for i in &self.mismatched_indexes {
@@ -89,7 +86,8 @@ impl<'a, R: Clone + PartialEq> ExperimentResult<'a, R> {
         return mismatched;
     }
 
-    pub fn ignores(&self) -> Vec<&Observation<R>> {
+    /// return ignored observations
+    pub fn ignored(&self) -> Vec<&Observation<R>> {
         let mut ignores = vec![];
         for i in &self.ignored_indexes {
             if let Some(observation) = self.observations.get(*i) {

@@ -14,6 +14,7 @@ mod result_publisher;
 mod tests {
     use crate::errors::{BehaviorNotUnique, VictorsErrors, VictorsResult};
     use crate::experiment::Experiment;
+    use crate::observation::Observation;
     use crate::victor::Victor;
 
     #[test]
@@ -42,13 +43,6 @@ mod tests {
     // TODO: before_run setup
 
 
-    // it "runs the named test instead of the control" do
-
-    // #[test]
-    // fn should_allow_to_build_experiment_fluently() -> VictorsResult<()> {
-    //     let experiment = Victor::default()?
-    // }
-
     #[test]
     fn should_be_able_to_create_and_run_experiment_via_victor() {
         let r = Victor::conduct("conduct test", |experiment| {
@@ -65,7 +59,7 @@ mod tests {
 
     #[test]
     fn should_be_able_to_create_and_run_uncontrolled_experiment_via_victor() {
-        let r = Victor::conduct_uncontrolled("conduct test", "second", |experiment| {
+        let r = Victor::conduct_uncontrolled("uncontrolled test", "second", |experiment| {
             // To fix the error below means we need to return Ok(()) at the end
             // cannot use the `?` operator in a closure that returns `()`
             // I dont love it but I suppose thats part of the rust idioms
@@ -94,8 +88,81 @@ mod tests {
     // ignore ignore_mismatched_observation tests
     // TODO: does not ignore an observation if no ignores are configured
     // TODO: calls a configured ignore block with the given observed values
+    #[test]
+    fn should_call_ignore_blocks_until_match() {
+        let (mut called_one, mut called_two, mut called_three) = (false, false, false);
+        let mut experiment = Experiment::default();
+        experiment.add_ignore(|a, b| { false });
+        experiment.add_ignore(|a, b| { true });
+        experiment.add_ignore(|a, b| { false });
+
+        let a = create_observation("a");
+        let b = create_observation("b");
+
+        assert!(experiment.ignore_mismatch_observation(&a, &b));
+        // assert!(called_one);
+        // assert!(called_two);
+        // assert!(!called_three);
+    }
+
+    // TODO: can't be run without a control behavior  --> this is at least one behavior
+    // TODO: runs other behaviors but always returns the control
+    // TODO: complains about duplicate behavior names
+    // TODO: swallows exceptions raised by candidate behaviors
+    // TODO: shuffles behaviors before running
+    // TODO: re-raises exceptions raised during publish by default
+    // TODO: reports publishing errors
+    // TODO: publishes results
+    // TODO: does not publish results when there is only a control value
+    // TODO: compares results with a comparator block if provided
+    // TODO: compares errors with an error comparator block if provided
+    // TODO: knows how to compare two experiments
+    // TODO: uses a compare block to determine if observations are equivalent
+    // TODO: reports errors in a compare block
+    // TODO: reports errors in the enabled? method
+    // TODO: reports errors in a run_if block
+    // TODO: returns the given value when no clean block is configured
+    // TODO: calls the configured clean block with a value when configured
+    // TODO: reports an error and returns the original value when an error is raised in a clean block
+
+
     // TODO: calls multiple ignore blocks to see if any match
     // TODO: only calls ignore blocks until one matches
     // TODO: reports exceptions raised in an ignore block and returns false
     // TODO: skips ignore blocks that raise and tests any remaining blocks if an exception is swallowed
+
+    // TODO: raising on mismatches
+    // TODO: "raises when there is a mismatch if raise on mismatches is enabled"
+    // TODO: "cleans values when raising on observation mismatch"
+    // TODO: "doesn't raise when there is a mismatch if raise on mismatches is disabled"
+    // TODO: "raises a mismatch error if the control raises and candidate doesn't"
+    // TODO: "raises a mismatch error if the candidate raises and the control doesn't"
+
+
+    // TODO: can be marshaled
+
+    // TODO: raise_on_mismatches
+    // TODO: raises when there is a mismatch if the experiment instance's raise on mismatches is enabled
+    // TODO: doesn't raise when there is a mismatch if the experiment instance's raise on mismatches is disabled
+
+
+    // TODO: MismatchError
+    // TODO: has the name of the experiment
+    // TODO: includes the experiments' results
+    // TODO: formats nicely as a string
+    // TODO: includes the backtrace when an observation raises
+
+    // TODO: before run block
+    // TODO: does not run when an experiment is disabled
+
+
+
+    fn create_observation(name: &'static str) -> Observation<u8> {
+        return Observation::new(
+            name.to_string(),
+            "experiment".to_string(),
+            1,
+            None,
+            1);
+    }
 }

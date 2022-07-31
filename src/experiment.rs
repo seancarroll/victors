@@ -1,6 +1,3 @@
-// # Whether to raise when the control and candidate mismatch.
-// # If this is nil, raise_on_mismatches class attribute is used instead.
-// attr_accessor :raise_on_mismatches
 use std::collections::HashMap;
 use std::time::Instant;
 use rand::seq::SliceRandom;
@@ -9,6 +6,7 @@ use serde_json::Value;
 use crate::errors::{BehaviorMissing, BehaviorNotUnique, MismatchError, VictorsErrors, VictorsResult};
 use crate::experiment_result::ExperimentResult;
 use crate::observation::Observation;
+use crate::result_publisher::{NoopPublisher, Publisher};
 
 
 static CONTROL_NAME: &str = "control";
@@ -31,28 +29,48 @@ static DEFAULT_EXPERIMENT_NAME: &str = "experiment";
 // Then make Experiment a trait (or Experimentation).
 
 // TODO: make type alias for these various fn blocks
+type BehaviorBlock<R> = fn() -> R;
+type RunIfBlock = fn() -> bool;
+type BeforeRunBlock = fn();
+type CleanerBlock<R> = fn(R);
+type EnabledFn = fn() -> bool;
+type IgnoresBlock<R> = fn(&Observation<R>, &Observation<R>) -> bool;
+type ValueComparator<R> = fn(a: &R, b: &R) -> bool;
+type ErrorComparator = fn(a: &String, b: &String) -> bool;
+// type PublisherBlock<R> = Box<dyn Publisher<ExperimentResult<R>>>;
+type PublisherBlock<R> = fn(result: &ExperimentResult<R>);
 
 #[derive(Clone)]
 pub struct Experiment<R: Clone + PartialEq> {
     pub name: String,
-    // TODO: separate out control and then have map of candidates
-    behaviors: HashMap<String, fn() -> R>,
-    pub run_if_block: Option<fn() -> bool>,
-    pub before_run_block: Option<fn()>,
-    pub cleaner: Option<fn(R)>,
-    pub enabled: fn() -> bool,
-    context: HashMap<String, Value>,
-    ignores: Vec<fn(&Observation<R>, &Observation<R>) -> bool>, // TODO: might need to return Result<bool>
+
+    // TODO: probably need to have behaviors return results
+    behaviors: HashMap<String, BehaviorBlock<R>>,
+
+    // Sometimes you don't want an experiment to run. Say, disabling a new codepath for anyone
+    // who isn't staff. You can disable an experiment by setting a run_if block.
+    // If this returns false, the experiment will merely return the control value.
+    // Otherwise, it defers to the experiment's configured enabled? method.
+
+    /// Used to disable an experiment. If this returns false the experiment will merely return the
+    /// control value. Otherwise it defers to the experiment's configured enabled method.
+    pub run_if_block: Option<RunIfBlock>,
+    pub before_run_block: Option<BeforeRunBlock>,
+    pub cleaner: Option<CleanerBlock<R>>,
+    pub enabled: EnabledFn,
+    pub context: HashMap<String, Value>,
+    ignores: Vec<IgnoresBlock<R>>, // TODO: might need to return Result<bool>
     pub err_on_mismatches: bool,
-    comparator: Option<fn(a: &R, b: &R) -> bool>,
-    error_comparator: Option<fn(a: &VictorsErrors, b: &VictorsErrors) -> bool>
+    comparator: Option<ValueComparator<R>>,
+    error_comparator: Option<ErrorComparator>,
+    pub publisher: PublisherBlock<R>,
 }
 
 impl<R: Clone + PartialEq> Experiment<R> {
 
     /// Creates a new experiment with the name "experiment"
     pub fn default() -> Self {
-        return Experiment::new("experiment");
+        return Experiment::new(DEFAULT_EXPERIMENT_NAME);
     }
 
     /// Creates a new experiment
@@ -71,7 +89,8 @@ impl<R: Clone + PartialEq> Experiment<R> {
             ignores: vec![],
             err_on_mismatches: false,
             comparator: None,
-            error_comparator: None
+            error_comparator: None,
+            publisher: |result| {}
         }
     }
 
@@ -92,7 +111,8 @@ impl<R: Clone + PartialEq> Experiment<R> {
             ignores: vec![],
             err_on_mismatches: false,
             comparator: None,
-            error_comparator: None
+            error_comparator: None,
+            publisher: |result| {}
         }
     }
 
@@ -103,17 +123,17 @@ impl<R: Clone + PartialEq> Experiment<R> {
         }
     }
 
-    // Register a named behavior for this experiment, default "candidate".
-    pub fn candidate(&mut self, name: &str, f: fn() -> R) -> VictorsResult<()> {
+    /// Register a named behavior for this experiment, default "candidate".
+    pub fn candidate(&mut self, name: &str, f: BehaviorBlock<R>) -> VictorsResult<()> {
         self.add_behavior(name, f)
     }
 
-    // Register the control behavior for this experiment.
-    pub fn control(&mut self, f: fn() -> R) -> VictorsResult<()> {
-        self.add_behavior("control", f)
+    /// Register the control behavior for this experiment.
+    pub fn control(&mut self, f: BehaviorBlock<R>) -> VictorsResult<()> {
+        self.add_behavior(CONTROL_NAME, f)
     }
 
-    fn add_behavior(&mut self, name: &str, f: fn() -> R) -> VictorsResult<()> {
+    fn add_behavior(&mut self, name: &str, f: BehaviorBlock<R>) -> VictorsResult<()> {
         if self.behaviors.contains_key(name) {
             return Err(VictorsErrors::BehaviorNotUnique(BehaviorNotUnique {
                 experiment_name: (*&self.name).to_string(),
@@ -125,30 +145,17 @@ impl<R: Clone + PartialEq> Experiment<R> {
         return Ok(());
     }
 
-    // Define a block of code to run before an experiment begins, if the experiment is enabled.
-    pub fn before_run(&mut self, f: fn()) {
+    /// Define a block of code to run before an experiment begins, if the experiment is enabled.
+    pub fn before_run(&mut self, f: BeforeRunBlock) {
         self.before_run_block = Some(f)
     }
 
-    // # A block to clean an observed value for publishing or storing.
-    // #
-    // # The block takes one argument, the observed value which will be cleaned.
-    // #
-    // # Returns the configured block.
-    // def clean(&block)
-    // @_scientist_cleaner = block
-    // end
-
-    // A block to clean an observed value for publishing or storing.
-    // The block takes one argument, the observed value which will be cleaned.
-    pub fn clean(&mut self, f: fn(R)) {
+    /// A block to clean an observed value for publishing or storing.
+    /// The block takes one argument, the observed value which will be cleaned.
+    pub fn clean(&mut self, f: CleanerBlock<R>) {
         self.cleaner = Some(f)
     }
 
-
-    // fn raise_on_mismatch(&self) -> bool {
-    //
-    // }
 
     fn generate_result(&self, name: String) -> VictorsResult<ExperimentResult<R>> {
         let mut observations = vec![];
@@ -194,22 +201,6 @@ impl<R: Clone + PartialEq> Experiment<R> {
                 ))
             }
         }
-
-        // TODO: get control
-        // TODO: return result
-        // control = observations.detect { |o| o.name == name }
-        // Scientist::Result.new(self, observations, control)
-
-
-        // TODO: change to ?
-        // let c = observations.into_iter().find(|o| o.name == name)
-        //     .expect("should find name in observations");
-        // TODO: can we change this to avoid the clones?
-        // return Ok(ExperimentResult::new(
-        //     self,
-        //     candidate_observations,
-        //     observation_to_return.
-        // ));
     }
 
     pub fn add_context(&mut self, context: HashMap<String, Value>) {
@@ -251,8 +242,7 @@ impl<R: Clone + PartialEq> Experiment<R> {
 
     // TODO: does this need to return a result?
     pub fn observations_are_equivalent(&self, a: &Observation<R>, b: &Observation<R>) -> bool {
-        // a.equivalent_to(b, self.comparator, self.error_comparator)
-        return false;
+        return a.equivalent_to(b, self.comparator, self.error_comparator);
     }
 
     fn enabled(&mut self, enabled: fn() -> bool) {
@@ -263,8 +253,11 @@ impl<R: Clone + PartialEq> Experiment<R> {
         return (self.enabled)();
     }
 
-    // Don't publish anything.
-    fn publish(&self, result: &ExperimentResult<R>) {}
+    // // Don't publish anything.
+    // fn publish(&self, result: &ExperimentResult<R>) {}
+    fn set_publisher(&mut self, publisher: fn(&ExperimentResult<R>)) {
+        self.publisher = publisher;
+    }
 
     // TODO: run needs to return a generic result
 
@@ -287,13 +280,23 @@ impl<R: Clone + PartialEq> Experiment<R> {
 
     /// Run all the behaviors for this experiment, observing each and publishing the results.
     /// Return the result of the named behavior
+    ///
+    /// # Arguments
+    /// * `name`
     pub(crate) fn internal_run(&self, name: &str) -> VictorsResult<R> {
         let block = self.behaviors.get(name);
-        if block.is_none() {
-            return Err(VictorsErrors::BehaviorMissing(BehaviorMissing {
-                experiment_name: (*&self.name).to_string(),
-                name: name.to_string(),
-            }));
+        match block {
+            None => {
+                return Err(VictorsErrors::BehaviorMissing(BehaviorMissing {
+                    experiment_name: (*&self.name).to_string(),
+                    name: name.to_string(),
+                }));
+            }
+            Some(block) => {
+                if !self.should_experiment_run() {
+                    return Ok(block());
+                }
+            }
         }
 
         if let Some(before_block) = &self.before_run_block {
@@ -301,10 +304,10 @@ impl<R: Clone + PartialEq> Experiment<R> {
         }
 
         let result = self.generate_result(name.to_string())?;
-        // TODO: this should return a VictorsError<()> to handle
+        // TODO: this should return a VictorsError<()> to handle errors?
         // ruby version has a `raised` fn that takes in operation and error and allows users to
         // customize behavior. Default behavior is to re-raise the exception
-        self.publish(&result);
+        (self.publisher)(&result);
 
         if self.err_on_mismatches && result.matched() {
             // TODO: do we want to support custom mismatch error?
@@ -351,7 +354,7 @@ impl<R: Clone + PartialEq> Experiment<R> {
     /// # Arguments
     /// * `comparator` - The block must take two arguments, the control error and a candidate error,
     ///                  and return true or false.
-    pub fn error_comparator(&mut self, comparator: fn(&VictorsErrors, b: &VictorsErrors) -> bool) {
+    pub fn error_comparator(&mut self, comparator: ErrorComparator) {
         self.error_comparator = Some(comparator);
     }
 
@@ -395,19 +398,19 @@ impl<R: Clone + PartialEq> UncontrolledExperiment<R> {
         self.experiment.run_if_block_allows()
     }
 
-    // Register a named behavior for this experiment, default "candidate".
-    pub fn candidate(&mut self, name: &str, f: fn() -> R) -> VictorsResult<()> {
+    /// Register a named behavior for this experiment, default "candidate".
+    pub fn candidate(&mut self, name: &str, f: BehaviorBlock<R>) -> VictorsResult<()> {
         self.experiment.candidate(name, f)
     }
 
-    // Define a block of code to run before an experiment begins, if the experiment is enabled.
-    pub fn before_run(&mut self, f: fn()) {
+    /// Define a block of code to run before an experiment begins, if the experiment is enabled.
+    pub fn before_run(&mut self, f: BeforeRunBlock) {
         self.experiment.before_run(f)
     }
 
-    // A block to clean an observed value for publishing or storing.
-    // The block takes one argument, the observed value which will be cleaned.
-    pub fn clean(&mut self, f: fn(R)) {
+    /// A block to clean an observed value for publishing or storing.
+    /// The block takes one argument, the observed value which will be cleaned.
+    pub fn clean(&mut self, f: CleanerBlock<R>) {
         self.experiment.clean(f)
     }
 
@@ -442,9 +445,9 @@ impl<R: Clone + PartialEq> UncontrolledExperiment<R> {
         return (self.experiment.enabled)();
     }
 
-    fn publish(&self, result: &ExperimentResult<R>) {
-        self.experiment.publish(result)
-    }
+    // fn publish(&self, result: &ExperimentResult<R>) {
+    //     self.experiment.publish(result)
+    // }
 
 
     /// Run all the behaviors for this experiment, observing each and publishing the results.
