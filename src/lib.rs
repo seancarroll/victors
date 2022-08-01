@@ -38,7 +38,10 @@ mod tests {
     // TODO: pass context
     // TODO: publish
     // TODO: clean values
-    // TODO: run_if
+
+
+    // TODO: run_if - run "experiment" means candidates but not sure if we really need to change
+    // the language or not
     #[test]
     fn should_not_run_candidates_when_run_if_returns_false() {
         let mut experiment = Experiment::default();
@@ -138,6 +141,26 @@ mod tests {
     // TODO: does not publish results when there is only a control value
     // TODO: compares results with a comparator block if provided
     // TODO: compares errors with an error comparator block if provided
+    #[test]
+    fn should_compare_results_with_comparator_when_provided() {
+        #[derive(Clone, PartialEq)]
+        struct TestResult {
+            count: u8,
+            message: &'static str
+        }
+
+        let mut experiment = Experiment::default();
+        experiment.control(|| { TestResult { count: 1, message: "control msg"} }).unwrap();
+        experiment.candidate("candidate", || TestResult { count: 1, message: "candidate msg"}).unwrap();
+        experiment.comparator(|a, b| { a.count == b.count });
+
+        let value = experiment.run().unwrap();
+        assert_eq!(1, value.count);
+        assert_eq!("control msg", value.message);
+        // TODO: need to validate results matched
+    }
+
+
     // TODO: knows how to compare two experiments
     // TODO: uses a compare block to determine if observations are equivalent
     // TODO: reports errors in a compare block

@@ -38,7 +38,9 @@ pub trait Experimentation<F, R>
 // Then make Experiment a trait (or Experimentation).
 
 // TODO: make type alias for these various fn blocks
+// TODO:
 type BehaviorBlock<R> = fn() -> R;
+// type BehaviorBlock<R> = Box<dyn FnOnce() -> R>;
 type RunIfBlock = fn() -> bool;
 type BeforeRunBlock = fn();
 type CleanerBlock<R> = fn(R);
@@ -135,6 +137,7 @@ impl<R: Clone + PartialEq> Experiment<R> {
     pub fn run_if(&mut self, block: RunIfBlock) {
         self.run_if_block = Some(block);
     }
+
     fn run_if_block_allows(&self) -> bool {
         match &self.run_if_block {
             None => true,
@@ -362,6 +365,7 @@ impl<R: Clone + PartialEq> Experiment<R> {
         return Ok(result.control().unwrap().value.to_owned());
     }
 
+
     fn should_experiment_run(&self) -> bool {
         return self.behaviors.len() > 1 && self.is_enabled() && self.run_if_block_allows();
     }
@@ -376,7 +380,7 @@ impl<R: Clone + PartialEq> Experiment<R> {
     /// # Arguments
     /// * `comparator` - The block must take two arguments, the control value and a candidate value,
     ///                  and return true or false.
-    pub fn comparator(&mut self, comparator: fn(&R, b: &R) -> bool) {
+    pub fn comparator(&mut self, comparator: fn(a: &R, b: &R) -> bool) {
         self.comparator = Some(comparator);
     }
 
