@@ -5,7 +5,7 @@ use crate::observation::Observation;
 
 // TODO: given this should be immutable remove pub from fields
 /// The immutable result of running an experiment.
-#[derive(Clone, PartialEq)]
+#[derive(PartialEq)]
 pub struct ExperimentResult<R: Clone + PartialEq> {
     // pub experiment: &'a dyn Experiment,
     // TODO: ugh...this would need to change in order to use controlled/uncontrolled

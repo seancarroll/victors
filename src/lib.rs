@@ -39,6 +39,30 @@ mod tests {
     // TODO: publish
     // TODO: clean values
     // TODO: run_if
+    #[test]
+    fn should_not_run_candidates_when_run_if_returns_false() {
+        let mut experiment = Experiment::default();
+        experiment.control(|| { 1 }).expect("control shouldnt fail");
+        experiment.candidate("candidate", || { 1 }).expect("candidate shouldnt fail");
+        experiment.run_if(|| { false });
+        let result = experiment.run().unwrap();
+
+        assert_eq!(1, result);
+        // TODO: how to confirm candidate
+    }
+
+    fn should_run_candidates_when_run_if_returns_true() {
+        let mut experiment = Experiment::default();
+        experiment.control(|| { 1 }).expect("control shouldnt fail");
+        experiment.candidate("candidate", || { 1 }).expect("candidate shouldnt fail");
+        experiment.run_if(|| { true });
+        let result = experiment.run().unwrap();
+
+        assert_eq!(1, result);
+        // TODO: how to confirm candidate
+    }
+
+
     // TODO: parallel
     // TODO: before_run setup
 
@@ -90,7 +114,8 @@ mod tests {
     // TODO: calls a configured ignore block with the given observed values
     #[test]
     fn should_call_ignore_blocks_until_match() {
-        let (mut called_one, mut called_two, mut called_three) = (false, false, false);
+        // TODO: I wish we could capture a variable in the closure to test that specific ignores
+        // were called but I cant get FnOnce to work in a loop and not sure how else to accomplish it
         let mut experiment = Experiment::default();
         experiment.add_ignore(|a, b| { false });
         experiment.add_ignore(|a, b| { true });
@@ -100,9 +125,6 @@ mod tests {
         let b = create_observation("b");
 
         assert!(experiment.ignore_mismatch_observation(&a, &b));
-        // assert!(called_one);
-        // assert!(called_two);
-        // assert!(!called_three);
     }
 
     // TODO: can't be run without a control behavior  --> this is at least one behavior

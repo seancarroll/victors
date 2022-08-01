@@ -13,6 +13,15 @@ static CONTROL_NAME: &str = "control";
 static DEFAULT_CANDIDATE_NAME: &str = "candidate";
 static DEFAULT_EXPERIMENT_NAME: &str = "experiment";
 
+pub trait Experimentation<F, R>
+    where
+        F: FnOnce(&Observation<R>, &Observation<R>) -> bool
+{
+
+    fn add_ignore(&mut self, block: F);
+
+}
+
 // pub trait Experiment {
 //     // TODO: allow sampling which can be done see ramping up
 //     fn is_enabled(&self) -> bool;
@@ -34,13 +43,13 @@ type RunIfBlock = fn() -> bool;
 type BeforeRunBlock = fn();
 type CleanerBlock<R> = fn(R);
 type EnabledFn = fn() -> bool;
+// type IgnoresBlock<R> = Box<dyn FnOnce(&Observation<R>, &Observation<R>) -> bool>;
 type IgnoresBlock<R> = fn(&Observation<R>, &Observation<R>) -> bool;
 type ValueComparator<R> = fn(a: &R, b: &R) -> bool;
 type ErrorComparator = fn(a: &String, b: &String) -> bool;
 // type PublisherBlock<R> = Box<dyn Publisher<ExperimentResult<R>>>;
 type PublisherBlock<R> = fn(result: &ExperimentResult<R>);
 
-#[derive(Clone)]
 pub struct Experiment<R: Clone + PartialEq> {
     pub name: String,
 
@@ -58,13 +67,19 @@ pub struct Experiment<R: Clone + PartialEq> {
     pub before_run_block: Option<BeforeRunBlock>,
     pub cleaner: Option<CleanerBlock<R>>,
     pub enabled: EnabledFn,
-    pub context: HashMap<String, Value>,
-    ignores: Vec<IgnoresBlock<R>>, // TODO: might need to return Result<bool>
+    pub context: HashMap<String, Value>, // TODO: maybe AHashMap<String, Box<dyn Any>>, https://github.com/actix/actix-web/blob/7dc034f0fb70846d9bb3445a2414a142356892e1/actix-http/src/extensions.rs
+    ignores: Vec<IgnoresBlock<R>>, //Vec<fn(&Observation<R>, &Observation<R>) -> bool>, // TODO: might need to return Result<bool>
     pub err_on_mismatches: bool,
     comparator: Option<ValueComparator<R>>,
     error_comparator: Option<ErrorComparator>,
     pub publisher: PublisherBlock<R>,
 }
+
+// impl<F: FnOnce(&Observation<R>, &Observation<R>) -> bool, R: Clone + PartialEq> Experimentation<F, R> for Experiment<R> {
+//     fn add_ignore(&mut self, block: F) {
+//         self.ignores.push(block);
+//     }
+// }
 
 impl<R: Clone + PartialEq> Experiment<R> {
 
@@ -116,6 +131,10 @@ impl<R: Clone + PartialEq> Experiment<R> {
         }
     }
 
+    /// Define a block that determines whether or not the candidate experiments should run.
+    pub fn run_if(&mut self, block: RunIfBlock) {
+        self.run_if_block = Some(block);
+    }
     fn run_if_block_allows(&self) -> bool {
         match &self.run_if_block {
             None => true,
@@ -213,7 +232,7 @@ impl<R: Clone + PartialEq> Experiment<R> {
     /// * `ignore_block` - Function takes two arguments, the control observation an the candidate
     ///                    observation which didn't match the control. If the block returns true the
     ///                    mismatch is disregarded.
-    pub fn add_ignore(&mut self, ignore_block: fn(&Observation<R>, &Observation<R>) -> bool) {
+    pub fn add_ignore(&mut self, ignore_block: IgnoresBlock<R>) {
         self.ignores.push(ignore_block)
     }
 
@@ -237,7 +256,19 @@ impl<R: Clone + PartialEq> Experiment<R> {
             return false;
         }
 
+        // for n in 1..self.ignores.len() {
+        //     if self.ignores[n](&control, &candidate) {
+        //         return true;
+        //     }
+        // }
+
         return self.ignores.iter().any(|ignore| ignore(&control, &candidate));
+        // for ignore in &self.ignores {
+        //     if ignore(&control, &candidate) {
+        //         return true;
+        //     }
+        // }
+        // return false;
     }
 
     // TODO: does this need to return a result?
@@ -424,7 +455,7 @@ impl<R: Clone + PartialEq> UncontrolledExperiment<R> {
     /// * `ignore_block` - Function takes two arguments, the control observation an the candidate
     ///                    observation which didn't match the control. If the block returns true the
     ///                    mismatch is disregarded.
-    pub fn add_ignore(&mut self, ignore_block: fn(&Observation<R>, &Observation<R>) -> bool) {
+    pub fn add_ignore(&mut self, ignore_block: IgnoresBlock<R>) {
         self.experiment.add_ignore(ignore_block)
     }
 

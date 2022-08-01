@@ -11,7 +11,7 @@ use crate::experiment::Experiment;
 
 // TODO: should R also include Copy?
 /// What happened when this named behavior was executed? Immutable.
-#[derive(Clone, PartialEq)]
+#[derive(PartialEq)]
 pub struct Observation<R: Clone + PartialEq>  {
     /// The experiment this observation is for
     pub experiment_name: String,
