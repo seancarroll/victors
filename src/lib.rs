@@ -2,6 +2,7 @@
 #![doc(issue_tracker_base_url = "https://github.com/seancarroll/victors/issues/")]
 #![cfg_attr(docsrs, deny(broken_intra_doc_links))]
 #![feature(backtrace)]
+#![deny(elided_lifetimes_in_paths)]
 
 mod errors;
 mod experiment;
@@ -12,9 +13,15 @@ mod result_publisher;
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Borrow;
+    use std::cell::RefCell;
+    use std::pin::Pin;
+    use std::rc::Rc;
     use crate::errors::{BehaviorNotUnique, VictorsErrors, VictorsResult};
     use crate::experiment::Experiment;
+    use crate::experiment_result::ExperimentResult;
     use crate::observation::Observation;
+    use crate::result_publisher::InMemoryPublisher;
     use crate::victor::Victor;
 
     #[test]
@@ -154,9 +161,27 @@ mod tests {
         experiment.candidate("candidate", || TestResult { count: 1, message: "candidate msg"}).unwrap();
         experiment.comparator(|a, b| { a.count == b.count });
 
+        // let mut x: Option<ExperimentResult<TestResult>> = None;
+        let v: Rc<RefCell<Option<ExperimentResult<TestResult>>>> = Rc::new(RefCell::new(None));
+        let r: RefCell<Option<ExperimentResult<TestResult>>> = RefCell::new(None);
+        // let p1 = Pin::new(&mut r);
+
+        let publisher: InMemoryPublisher<TestResult, _>
+            = InMemoryPublisher::new(|result| { r.swap(&RefCell::new(Some(result.clone()))); });
+        // let publisher: InMemoryPublisher<TestResult, _>
+        //     = InMemoryPublisher::new(|result| { x = Some(result.clone()) });
+        // let publisher: InMemoryPublisher<TestResult, _>
+        //     = InMemoryPublisher::new(|result| { *r.borrow_mut() = Some(result.clone()); });
+        experiment.result_publisher(publisher);
+        // experiment.set_publisher(InMemoryPublisher::new(|result| { r.swap(&RefCell::new(Some(result.clone()))); }));
         let value = experiment.run().unwrap();
         assert_eq!(1, value.count);
         assert_eq!("control msg", value.message);
+        // r.take().unwrap().matched();
+        // x.to_owned().unwrap().matched();
+        // let b = &publisher.result.borrow().take().unwrap().mismatched();
+        // assert!(&publisher.result.take().unwrap().matched());
+        // assert_eq!(publisher.result.take());
         // TODO: need to validate results matched
     }
 

@@ -13,13 +13,40 @@ static CONTROL_NAME: &str = "control";
 static DEFAULT_CANDIDATE_NAME: &str = "candidate";
 static DEFAULT_EXPERIMENT_NAME: &str = "experiment";
 
-pub trait Experimentation<F, R>
-    where
-        F: FnOnce(&Observation<R>, &Observation<R>) -> bool
+pub trait Experimentation
 {
+    type Result;
 
-    fn add_ignore(&mut self, block: F);
+    // type T: Display = String;
+    type Ignore: FnOnce(&Observation<Self::Result>, &Observation<Self::Result>) -> bool;
 
+    type EnabledFn: Fn() -> bool;
+
+    type BeforeRunFn: Fn();
+
+    type RunIfFn: Fn() -> bool;
+
+    type CleanerFn: Fn(Self::Result);
+
+    type ComparatorFn: Fn(&Self::Result, &Self::Result) -> bool;
+
+    type ErrorComparatorFn: Fn(&String, &String) -> bool;
+
+    // fn run(&self, name: Option<&str>) -> VictorsResult<()>;
+
+    fn enabled(&mut self, enabled: Self::EnabledFn);
+
+    fn before_run_block(&mut self, block: Self::BeforeRunFn);
+
+    fn run_if(&mut self, block: Self::RunIfFn);
+
+    fn add_ignore(&mut self, block: Self::Ignore);
+
+    fn cleaner(&mut self, block: Self::CleanerFn);
+
+    fn comparator(&mut self, block: Self::ComparatorFn);
+
+    fn error_comparator(&mut self, block: Self::ErrorComparatorFn);
 }
 
 // pub trait Experiment {
@@ -50,9 +77,9 @@ type IgnoresBlock<R> = fn(&Observation<R>, &Observation<R>) -> bool;
 type ValueComparator<R> = fn(a: &R, b: &R) -> bool;
 type ErrorComparator = fn(a: &String, b: &String) -> bool;
 // type PublisherBlock<R> = Box<dyn Publisher<ExperimentResult<R>>>;
-type PublisherBlock<R> = fn(result: &ExperimentResult<R>);
+// type PublisherBlock<R> = fn(result: &ExperimentResult<R>);
 
-pub struct Experiment<R: Clone + PartialEq> {
+pub struct Experiment<'a, R: Clone + PartialEq> {
     pub name: String,
 
     // TODO: probably need to have behaviors return results
@@ -74,7 +101,7 @@ pub struct Experiment<R: Clone + PartialEq> {
     pub err_on_mismatches: bool,
     comparator: Option<ValueComparator<R>>,
     error_comparator: Option<ErrorComparator>,
-    pub publisher: PublisherBlock<R>,
+    pub publisher: Box<dyn Publisher<R> + 'a>,
 }
 
 // impl<F: FnOnce(&Observation<R>, &Observation<R>) -> bool, R: Clone + PartialEq> Experimentation<F, R> for Experiment<R> {
@@ -83,7 +110,7 @@ pub struct Experiment<R: Clone + PartialEq> {
 //     }
 // }
 
-impl<R: Clone + PartialEq> Experiment<R> {
+impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
 
     /// Creates a new experiment with the name "experiment"
     pub fn default() -> Self {
@@ -107,7 +134,8 @@ impl<R: Clone + PartialEq> Experiment<R> {
             err_on_mismatches: false,
             comparator: None,
             error_comparator: None,
-            publisher: |result| {}
+            // publisher: |result| {}
+            publisher: Box::new(NoopPublisher{}),
         }
     }
 
@@ -129,7 +157,8 @@ impl<R: Clone + PartialEq> Experiment<R> {
             err_on_mismatches: false,
             comparator: None,
             error_comparator: None,
-            publisher: |result| {}
+            // publisher: |result| {}
+            publisher: Box::new(NoopPublisher{})
         }
     }
 
@@ -289,8 +318,8 @@ impl<R: Clone + PartialEq> Experiment<R> {
 
     // // Don't publish anything.
     // fn publish(&self, result: &ExperimentResult<R>) {}
-    fn set_publisher(&mut self, publisher: fn(&ExperimentResult<R>)) {
-        self.publisher = publisher;
+    pub fn result_publisher<T: Publisher<R> + 'a>(&mut self, publisher: T) {
+        self.publisher = Box::new(publisher);
     }
 
     // TODO: run needs to return a generic result
@@ -308,7 +337,7 @@ impl<R: Clone + PartialEq> Experiment<R> {
     /// Run all the behaviors for this experiment, observing each and publishing the results.
     /// Return the result of the control
     /// See [internal_run]
-    pub fn run(&self) -> VictorsResult<R> {
+    pub fn run(&mut self) -> VictorsResult<R> {
         return self.internal_run(CONTROL_NAME);
     }
 
@@ -317,7 +346,7 @@ impl<R: Clone + PartialEq> Experiment<R> {
     ///
     /// # Arguments
     /// * `name`
-    pub(crate) fn internal_run(&self, name: &str) -> VictorsResult<R> {
+    pub(crate) fn internal_run(&mut self, name: &str) -> VictorsResult<R> {
         let block = self.behaviors.get(name);
         match block {
             None => {
@@ -341,7 +370,8 @@ impl<R: Clone + PartialEq> Experiment<R> {
         // TODO: this should return a VictorsError<()> to handle errors?
         // ruby version has a `raised` fn that takes in operation and error and allows users to
         // customize behavior. Default behavior is to re-raise the exception
-        (self.publisher)(&result);
+        // (self.publisher)(&result);
+        self.publisher.publish(&result);
 
         if self.err_on_mismatches && result.matched() {
             // TODO: do we want to support custom mismatch error?
@@ -395,11 +425,11 @@ impl<R: Clone + PartialEq> Experiment<R> {
 
 }
 
-pub struct UncontrolledExperiment<R: Clone + PartialEq> {
-    experiment: Experiment<R>
+pub struct UncontrolledExperiment<'a, R: Clone + PartialEq> {
+    experiment: Experiment<'a, R>
 }
 
-impl<R: Clone + PartialEq> UncontrolledExperiment<R> {
+impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
 
     /// Creates a new experiment with the name "experiment"
     pub fn default() -> Self {
@@ -488,7 +518,7 @@ impl<R: Clone + PartialEq> UncontrolledExperiment<R> {
     /// Run all the behaviors for this experiment, observing each and publishing the results.
     /// Return the result of the named candidate
     /// See [Experiment::internal_run]
-    pub fn run(&self, name: &'static str) -> VictorsResult<R> {
+    pub fn run(&mut self, name: &'static str) -> VictorsResult<R> {
         return self.experiment.internal_run(name);
     }
 

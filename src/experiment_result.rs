@@ -5,7 +5,7 @@ use crate::observation::Observation;
 
 // TODO: given this should be immutable remove pub from fields
 /// The immutable result of running an experiment.
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct ExperimentResult<R: Clone + PartialEq> {
     // pub experiment: &'a dyn Experiment,
     // TODO: ugh...this would need to change in order to use controlled/uncontrolled
@@ -52,7 +52,7 @@ impl<'a, R: Clone + PartialEq> ExperimentResult<R> {
     /// * `observations`
     /// * `control_index`
     pub fn new(
-        experiment: &'a Experiment<R>,
+        experiment: &'a Experiment<'_, R>,
         observations: Vec<Observation<R>>,
         control_index: usize
     ) -> Self {
@@ -147,9 +147,10 @@ impl<'a, R: Clone + PartialEq> ExperimentResult<R> {
     //     return (mismatched, ignored);
     // }
 
+    // TODO: can evaluate candidate outside and then dont have to worry about lifetime
     /// Evaluate the candidates to find mismatched and ignored results.
     fn evaluate_candidates(
-        experiment: &'a Experiment<R>,
+        experiment: &'a Experiment<'_, R>,
         observations: &'a Vec<Observation<R>>,
         control_index: usize,
     ) -> (Vec<usize>, Vec<usize>) {
