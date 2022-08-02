@@ -58,7 +58,7 @@ impl<'a, R: Clone + PartialEq> ExperimentResult<R> {
     ) -> Self {
         let (mismatched_indexes, ignored_indexes)
             = ExperimentResult::evaluate_candidates(experiment, &observations, control_index);
-
+        println!("experiment context is [{:?}]", &experiment.context);
         Self {
             experiment_name: experiment.name.to_string(),
             observations,

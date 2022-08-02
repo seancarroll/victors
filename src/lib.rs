@@ -15,9 +15,11 @@ mod result_publisher;
 mod tests {
     use std::borrow::Borrow;
     use std::cell::RefCell;
+    use std::collections::HashMap;
     use std::pin::Pin;
     use std::rc::Rc;
-    use crate::errors::{BehaviorNotUnique, VictorsErrors, VictorsResult};
+    use serde_json::Value;
+    use crate::errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult};
     use crate::experiment::Experiment;
     use crate::experiment_result::ExperimentResult;
     use crate::observation::Observation;
@@ -41,8 +43,43 @@ mod tests {
         assert_eq!("custom control", experiment.name);
     }
 
+    #[test]
+    fn should_return_error_when_controlled_experiment_has_no_control_behavior_defined() {
+        let mut experiment = Experiment::default();
+        experiment.candidate("candidate", || { 1 }).unwrap();
+        let result = experiment.run();
+        let expected = VictorsErrors::BehaviorMissing(BehaviorMissing {
+            experiment_name: "experiment".to_string(),
+            name: "control".to_string()
+        });
+        assert_eq!(expected, result.unwrap_err());
+    }
+
     // TODO: custom enabled fn
-    // TODO: pass context
+
+    // TODO: initialize with context
+    #[test]
+    fn should_allow_custom_context_to_be_passed_in() {
+        let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
+
+        let mut experiment = Experiment::default();
+        experiment.add_context(HashMap::from([
+            ("hello".to_string(), Value::String("world".to_string())),
+        ]));
+        experiment.control(|| { 1 }).expect("control shouldnt fail");
+        experiment.candidate("candidate", || { 1 }).expect("control shouldnt fail");
+        experiment.result_publisher(InMemoryPublisher::new(|result| {
+            r.swap(&RefCell::new(Some(result.clone())));
+        }));
+
+        let result = experiment.run().unwrap();
+
+        assert_eq!(
+            r.take().unwrap().context.get_key_value(&"hello".to_string()),
+            Some((&"hello".to_string(), &Value::String("world".to_string())))
+        );
+    }
+
     // TODO: publish
     // TODO: clean values
 
@@ -58,7 +95,7 @@ mod tests {
         let result = experiment.run().unwrap();
 
         assert_eq!(1, result);
-        // TODO: how to confirm candidate
+        // TODO: how to confirm candidate not called
     }
 
     fn should_run_candidates_when_run_if_returns_true() {
@@ -126,6 +163,7 @@ mod tests {
     fn should_call_ignore_blocks_until_match() {
         // TODO: I wish we could capture a variable in the closure to test that specific ignores
         // were called but I cant get FnOnce to work in a loop and not sure how else to accomplish it
+        // let (mut called_one, mut called_two, mut called_three) = (false, false, false);
         let mut experiment = Experiment::default();
         experiment.add_ignore(|a, b| { false });
         experiment.add_ignore(|a, b| { true });
