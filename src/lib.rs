@@ -57,7 +57,27 @@ mod tests {
 
     // TODO: custom enabled fn
 
-    // TODO: initialize with context
+    #[test]
+    fn should_allow_to_init_experiment_with_context() {
+        let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
+
+        let mut experiment = Experiment::new_with_context("experiment", HashMap::from([
+            ("hello".to_string(), Value::String("world".to_string())),
+        ]));
+        experiment.control(|| { 1 }).expect("control shouldnt fail");
+        experiment.candidate("candidate", || { 1 }).expect("control shouldnt fail");
+        experiment.result_publisher(InMemoryPublisher::new(|result| {
+            r.swap(&RefCell::new(Some(result.clone())));
+        }));
+
+        let result = experiment.run().unwrap();
+
+        assert_eq!(
+            r.take().unwrap().context.get_key_value(&"hello".to_string()),
+            Some((&"hello".to_string(), &Value::String("world".to_string())))
+        );
+    }
+
     #[test]
     fn should_allow_custom_context_to_be_passed_in() {
         let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
@@ -98,6 +118,7 @@ mod tests {
         // TODO: how to confirm candidate not called
     }
 
+    #[test]
     fn should_run_candidates_when_run_if_returns_true() {
         let mut experiment = Experiment::default();
         experiment.control(|| { 1 }).expect("control shouldnt fail");
