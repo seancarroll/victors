@@ -262,10 +262,7 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     }
 
     pub fn add_context(&mut self, context: HashMap<String, Value>) {
-        println!("adding context [{:?}]", &context);
         self.context.extend(context);
-        println!("experiment context after add [{:?}]", &self.context);
-
     }
 
     /// Configure experiment to ignore observations based on the given block.
@@ -380,8 +377,6 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
         // TODO: this should return a VictorsError<()> to handle errors?
         // ruby version has a `raised` fn that takes in operation and error and allows users to
         // customize behavior. Default behavior is to re-raise the exception
-        // (self.publisher)(&result);
-        println!("calling publish....");
         self.publisher.publish(&result);
 
         if self.err_on_mismatches && result.matched() {
