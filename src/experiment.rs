@@ -24,7 +24,7 @@ pub trait Experimentation
 
     type BeforeRunFn: Fn();
 
-    type RunIfFn: Fn() -> bool;
+    type RunIfFn: FnOnce() -> bool;
 
     type CleanerFn: Fn(Self::Result);
 
@@ -32,9 +32,11 @@ pub trait Experimentation
 
     type ErrorComparatorFn: Fn(&String, &String) -> bool;
 
-    // fn run(&self, name: Option<&str>) -> VictorsResult<()>;
+    fn run(&self, name: Option<&str>) -> Self::Result;
 
     fn enabled(&mut self, enabled: Self::EnabledFn);
+
+    fn is_enabled(&self) -> bool;
 
     fn before_run_block(&mut self, block: Self::BeforeRunFn);
 
@@ -44,9 +46,13 @@ pub trait Experimentation
 
     fn cleaner(&mut self, block: Self::CleanerFn);
 
+    // fn publisher<T: Publisher<R> + 'a>(&mut self, publisher: T);
+
     fn comparator(&mut self, block: Self::ComparatorFn);
 
     fn error_comparator(&mut self, block: Self::ErrorComparatorFn);
+
+    fn add_context(&mut self, context: HashMap<String, Value>);
 }
 
 // pub trait Experiment {
@@ -67,7 +73,8 @@ pub trait Experimentation
 // TODO: make type alias for these various fn blocks
 // TODO:
 type BehaviorBlock<R> = fn() -> R;
-// type BehaviorBlock<R> = Box<dyn FnOnce() -> R>;
+// type BehaviorBlock<R> = dyn FnOnce() -> R;
+type BoxedBehaviorBlock<R> = Box<BehaviorBlock<R>>;
 type RunIfBlock = fn() -> bool;
 type BeforeRunBlock = fn();
 type CleanerBlock<R> = fn(R);

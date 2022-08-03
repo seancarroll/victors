@@ -108,26 +108,42 @@ mod tests {
     // the language or not
     #[test]
     fn should_not_run_candidates_when_run_if_returns_false() {
+        let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
+        // let mut v = false;
         let mut experiment = Experiment::default();
         experiment.control(|| { 1 }).expect("control shouldnt fail");
         experiment.candidate("candidate", || { 1 }).expect("candidate shouldnt fail");
         experiment.run_if(|| { false });
+        experiment.result_publisher(InMemoryPublisher::new(|result| {
+            r.swap(&RefCell::new(Some(result.clone())));
+        }));
+
         let result = experiment.run().unwrap();
 
-        assert_eq!(1, result);
-        // TODO: how to confirm candidate not called
+        // assert_eq!(1, result);
+        // let missing_candidate = r.take().unwrap().observations.iter()
+        //     .find(|o| o.name == "candidate").is_none();
+        // assert!(missing_candidate);
     }
 
     #[test]
     fn should_run_candidates_when_run_if_returns_true() {
+        let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
+        // let mut v = false;
         let mut experiment = Experiment::default();
         experiment.control(|| { 1 }).expect("control shouldnt fail");
         experiment.candidate("candidate", || { 1 }).expect("candidate shouldnt fail");
         experiment.run_if(|| { true });
+        experiment.result_publisher(InMemoryPublisher::new(|result| {
+            r.swap(&RefCell::new(Some(result.clone())));
+        }));
+
         let result = experiment.run().unwrap();
 
-        assert_eq!(1, result);
-        // TODO: how to confirm candidate
+        // assert_eq!(1, result);
+        // let has_candidate = r.take().unwrap().observations.iter()
+        //     .find(|o| o.name == "candidate").is_some();
+        // assert!(has_candidate);
     }
 
 
