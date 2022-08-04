@@ -35,8 +35,8 @@ mod tests {
     #[test]
     fn it_works() {
         let mut experiment = Experiment::default();
-        experiment.control(|| { println!("control...")}).expect("control shouldnt fail");
-        experiment.candidate("", || { println!("candidate...") }).expect("candidate shouldnt fail");
+        experiment.control(|| { println!("control...")}).unwrap();
+        experiment.candidate("", || { println!("candidate...") }).unwrap();
 
         let result = experiment.run();
     }
@@ -44,7 +44,7 @@ mod tests {
     #[test]
     fn should_be_able_to_specify_control_name() {
         let mut experiment = Experiment::new("custom control");
-        experiment.control(|| { println!("control...")}).expect("control shouldnt fail");
+        experiment.control(|| { println!("control...")}).unwrap();
 
         assert_eq!("custom control", experiment.name);
     }
@@ -67,11 +67,12 @@ mod tests {
     fn should_allow_to_init_experiment_with_context() {
         let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
 
-        let mut experiment = Experiment::new_with_context("experiment", Context::from_value(json!({
-            "message": "hello world",
-        })).unwrap());
-        experiment.control(|| { 1 }).expect("control shouldnt fail");
-        experiment.candidate("candidate", || { 1 }).expect("control shouldnt fail");
+        let mut experiment = Experiment::new_with_context(
+            "experiment",
+            Context::from_value(json!({"message": "hello world"})).unwrap()
+        );
+        experiment.control(|| { 1 }).unwrap();
+        experiment.candidate("candidate", || { 1 }).unwrap();
         experiment.result_publisher(InMemoryPublisher::new(|result| {
             r.swap(&RefCell::new(Some(result.clone())));
         }));
@@ -89,11 +90,9 @@ mod tests {
         let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
 
         let mut experiment = Experiment::default();
-        experiment.add_context(Context::from_value(json!({
-            "message": "hello world",
-        })).unwrap());
-        experiment.control(|| { 1 }).expect("control shouldnt fail");
-        experiment.candidate("candidate", || { 1 }).expect("control shouldnt fail");
+        experiment.add_context(Context::from_value(json!({"message": "hello world"})).unwrap());
+        experiment.control(|| { 1 }).unwrap();
+        experiment.candidate("candidate", || { 1 }).unwrap();
         experiment.result_publisher(InMemoryPublisher::new(|result| {
             r.swap(&RefCell::new(Some(result.clone())));
         }));
@@ -117,8 +116,8 @@ mod tests {
         let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
         // let mut v = false;
         let mut experiment = Experiment::default();
-        experiment.control(|| { 1 }).expect("control shouldnt fail");
-        experiment.candidate("candidate", || { 1 }).expect("candidate shouldnt fail");
+        experiment.control(|| { 1 }).unwrap();
+        experiment.candidate("candidate", || { 1 }).unwrap();
         experiment.run_if(|| { false });
         experiment.result_publisher(InMemoryPublisher::new(|result| {
             r.swap(&RefCell::new(Some(result.clone())));
@@ -137,8 +136,8 @@ mod tests {
         let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
         // let mut v = false;
         let mut experiment = Experiment::default();
-        experiment.control(|| { 1 }).expect("control shouldnt fail");
-        experiment.candidate("candidate", || { 1 }).expect("candidate shouldnt fail");
+        experiment.control(|| { 1 }).unwrap();
+        experiment.candidate("candidate", || { 1 }).unwrap();
         experiment.run_if(|| { true });
         experiment.result_publisher(InMemoryPublisher::new(|result| {
             r.swap(&RefCell::new(Some(result.clone())));
@@ -188,8 +187,8 @@ mod tests {
     #[test]
     fn should_return_non_unique_error_when_multiple_candidates_are_registered_with_same_name() {
         let mut experiment = Experiment::default();
-        experiment.control(|| { println!("control...")}).expect("control shouldnt fail");
-        experiment.candidate("candidate", || { println!("candidate...") }).expect("candidate shouldnt fail");
+        experiment.control(|| { println!("control...")}).unwrap();
+        experiment.candidate("candidate", || { println!("candidate...") }).unwrap();
         let result = experiment.candidate("candidate", || { println!("second candidate...") });
         let expected = VictorsErrors::BehaviorNotUnique(BehaviorNotUnique {
             experiment_name: "experiment".to_string(),
