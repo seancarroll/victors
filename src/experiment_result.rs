@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use serde_json::Value;
+use crate::context::Context;
 use crate::experiment::Experiment;
 use crate::observation::Observation;
 
@@ -13,7 +14,7 @@ pub struct ExperimentResult<R: Clone + PartialEq> {
     // pub experiment: &'a Experiment<R>,
     pub experiment_name: String,
     pub observations: Vec<Observation<R>>,
-    pub context: HashMap<String, Value>,
+    pub context: Context,
     // pub candidates: Vec<Observation<R>>,
     // pub control: &'a Observation<R>,
     // TODO: I dont love using "control" here as its abusing the name for uncontrolled experiments

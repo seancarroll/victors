@@ -10,6 +10,11 @@ mod experiment_result;
 mod observation;
 mod victor;
 mod result_publisher;
+mod context;
+
+// Library exports.
+pub use crate::context::Context;
+// TODO: confirm what is being exported
 
 #[cfg(test)]
 mod tests {
@@ -18,7 +23,8 @@ mod tests {
     use std::collections::HashMap;
     use std::pin::Pin;
     use std::rc::Rc;
-    use serde_json::Value;
+    use serde_json::{json, Value};
+    use crate::context::Context;
     use crate::errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult};
     use crate::experiment::Experiment;
     use crate::experiment_result::ExperimentResult;
@@ -61,9 +67,9 @@ mod tests {
     fn should_allow_to_init_experiment_with_context() {
         let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
 
-        let mut experiment = Experiment::new_with_context("experiment", HashMap::from([
-            ("hello".to_string(), Value::String("world".to_string())),
-        ]));
+        let mut experiment = Experiment::new_with_context("experiment", Context::from_value(json!({
+            "message": "hello world",
+        })).unwrap());
         experiment.control(|| { 1 }).expect("control shouldnt fail");
         experiment.candidate("candidate", || { 1 }).expect("control shouldnt fail");
         experiment.result_publisher(InMemoryPublisher::new(|result| {
@@ -73,8 +79,8 @@ mod tests {
         let result = experiment.run().unwrap();
 
         assert_eq!(
-            r.take().unwrap().context.get_key_value(&"hello".to_string()),
-            Some((&"hello".to_string(), &Value::String("world".to_string())))
+            r.take().unwrap().context.get(&"message".to_string()),
+            Some(&Value::String("hello world".to_string()))
         );
     }
 
@@ -83,9 +89,9 @@ mod tests {
         let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
 
         let mut experiment = Experiment::default();
-        experiment.add_context(HashMap::from([
-            ("hello".to_string(), Value::String("world".to_string())),
-        ]));
+        experiment.add_context(Context::from_value(json!({
+            "message": "hello world",
+        })).unwrap());
         experiment.control(|| { 1 }).expect("control shouldnt fail");
         experiment.candidate("candidate", || { 1 }).expect("control shouldnt fail");
         experiment.result_publisher(InMemoryPublisher::new(|result| {
@@ -95,8 +101,8 @@ mod tests {
         let result = experiment.run().unwrap();
 
         assert_eq!(
-            r.take().unwrap().context.get_key_value(&"hello".to_string()),
-            Some((&"hello".to_string(), &Value::String("world".to_string())))
+            r.take().unwrap().context.get(&"message".to_string()),
+            Some(&Value::String("hello world".to_string()))
         );
     }
 

@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::time::Instant;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use serde_json::Value;
+use serde_json::value::{to_value, Map, Value};
+use crate::context::Context;
 use crate::errors::{BehaviorMissing, BehaviorNotUnique, MismatchError, VictorsErrors, VictorsResult};
 use crate::experiment_result::ExperimentResult;
 use crate::observation::Observation;
@@ -52,7 +53,7 @@ pub trait Experimentation
 
     fn error_comparator(&mut self, block: Self::ErrorComparatorFn);
 
-    fn add_context(&mut self, context: HashMap<String, Value>);
+    fn add_context(&mut self, context: Context);
 }
 
 // pub trait Experiment {
@@ -86,6 +87,8 @@ type ErrorComparator = fn(a: &String, b: &String) -> bool;
 // type PublisherBlock<R> = Box<dyn Publisher<ExperimentResult<R>>>;
 // type PublisherBlock<R> = fn(result: &ExperimentResult<R>);
 
+// TODO: make context a struct?
+
 pub struct Experiment<'a, R: Clone + PartialEq> {
     pub name: String,
 
@@ -103,7 +106,7 @@ pub struct Experiment<'a, R: Clone + PartialEq> {
     pub before_run_block: Option<BeforeRunBlock>,
     pub cleaner: Option<CleanerBlock<R>>,
     pub enabled: EnabledFn,
-    pub context: HashMap<String, Value>, // TODO: maybe AHashMap<String, Box<dyn Any>>, https://github.com/actix/actix-web/blob/7dc034f0fb70846d9bb3445a2414a142356892e1/actix-http/src/extensions.rs
+    pub context: Context, // TODO: maybe AHashMap<String, Box<dyn Any>>, https://github.com/actix/actix-web/blob/7dc034f0fb70846d9bb3445a2414a142356892e1/actix-http/src/extensions.rs
     ignores: Vec<IgnoresBlock<R>>, //Vec<fn(&Observation<R>, &Observation<R>) -> bool>, // TODO: might need to return Result<bool>
     pub err_on_mismatches: bool,
     comparator: Option<ValueComparator<R>>,
@@ -151,7 +154,7 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     /// # Arguments
     /// * `name` - the name of the experiment
     /// * `context` - Map of extra experiment data
-    pub fn new_with_context(name: &'static str, context: HashMap<String, Value>) -> Self {
+    pub fn new_with_context(name: &'static str, context: Context) -> Self {
         return Self {
             name: name.to_string(),
             behaviors: Default::default(),
@@ -261,7 +264,7 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
         }
     }
 
-    pub fn add_context(&mut self, context: HashMap<String, Value>) {
+    pub fn add_context(&mut self, context: Context) {
         self.context.extend(context);
     }
 
@@ -459,7 +462,7 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
     /// # Arguments
     /// * `name` - the name of the experiment
     /// * `context` - Map of extra experiment data
-    pub fn new_with_context(name: &'static str, context: HashMap<String, Value>) -> Self {
+    pub fn new_with_context(name: &'static str, context: Context) -> Self {
         return Self {
             experiment: Experiment::new_with_context(name, context)
         }
@@ -485,7 +488,7 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
         self.experiment.clean(f)
     }
 
-    pub fn add_context(&mut self, context: HashMap<String, Value>) {
+    pub fn add_context(&mut self, context: Context) {
         self.experiment.add_context(context)
     }
 

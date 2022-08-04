@@ -48,9 +48,16 @@ pub enum VictorsErrors {
     #[error("{} already has {} behavior", .0.experiment_name, .0.name)]
     BehaviorNotUnique(BehaviorNotUnique),
 
+    /// An error happened while serializing JSON
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+
     #[error("experiment '{}' observations mismatched", .0.experiment_name)]
     MismatchError(MismatchError),
 
+    /// Generic error
+    #[error("{0}")]
+    Msg(String),
 
     // TODO: see if this is needed. looks like scientist doesnt use it anywhere
     #[error("{0} didn't return a value")]
