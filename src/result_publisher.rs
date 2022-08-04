@@ -38,8 +38,6 @@ impl<R: Clone + PartialEq, CB> Publisher<R> for InMemoryPublisher<R, CB>
     where CB: FnOnce(&ExperimentResult<R>) + Copy
 {
     fn publish(&self, result: &ExperimentResult<R>) {
-        // TODO: see if there is a way to remove this clone
-        // self.result.swap(&RefCell::new(Some(result.clone())));
         (self.cb)(result);
     }
 }
