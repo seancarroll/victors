@@ -19,7 +19,7 @@ pub use crate::context::Context;
 #[cfg(test)]
 mod tests {
     use std::borrow::Borrow;
-    use std::cell::RefCell;
+    use std::cell::{Ref, RefCell};
     use std::collections::HashMap;
     use std::pin::Pin;
     use std::rc::Rc;
@@ -203,18 +203,24 @@ mod tests {
     // TODO: calls a configured ignore block with the given observed values
     #[test]
     fn should_call_ignore_blocks_until_match() {
-        // TODO: I wish we could capture a variable in the closure to test that specific ignores
-        // were called but I cant get FnOnce to work in a loop and not sure how else to accomplish it
-        // let (mut called_one, mut called_two, mut called_three) = (false, false, false);
+        // TODO: using RefCell seems like a hack. I can't figure out how to just mutate a boolean
+        // captured variable. All three types (Fn, FnOnce, FnMut) are problematic for various reasons
+        let (called_one, called_two, called_three)
+            = (RefCell::new(false), RefCell::new(false), RefCell::new(false));
+        // let mut called_one = false;
+
         let mut experiment = Experiment::default();
-        experiment.add_ignore(|a, b| { false });
-        experiment.add_ignore(|a, b| { true });
-        experiment.add_ignore(|a, b| { false });
+        experiment.add_ignore(|a, b| { called_one.swap(&RefCell::new(true)); false });
+        experiment.add_ignore(|a, b| { called_two.swap(&RefCell::new(true)); true });
+        experiment.add_ignore(|a, b| { called_three.swap(&RefCell::new(true)); false });
 
         let a = create_observation("a");
         let b = create_observation("b");
 
         assert!(experiment.ignore_mismatch_observation(&a, &b));
+        assert!(called_one.take());
+        assert!(called_two.take());
+        assert!(!called_three.take());
     }
 
     // TODO: can't be run without a control behavior  --> this is at least one behavior

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::time::Instant;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use serde_json::value::{to_value, Map, Value};
 use crate::context::Context;
 use crate::errors::{BehaviorMissing, BehaviorNotUnique, MismatchError, VictorsErrors, VictorsResult};
 use crate::experiment_result::ExperimentResult;
@@ -35,23 +34,37 @@ pub trait Experimentation
 
     fn run(&self, name: Option<&str>) -> Self::Result;
 
-    fn enabled(&mut self, enabled: Self::EnabledFn);
+    fn enabled<F>(&mut self, enabled: F)
+    where
+        F: Fn() -> bool;
 
     fn is_enabled(&self) -> bool;
 
-    fn before_run_block(&mut self, block: Self::BeforeRunFn);
+    fn before_run_block<F>(&mut self, block: F)
+    where
+        F: Fn();
 
-    fn run_if(&mut self, block: Self::RunIfFn);
+    fn run_if<F>(&mut self, block: F)
+    where
+        F: FnOnce() -> bool;
 
-    fn add_ignore(&mut self, block: Self::Ignore);
+    fn add_ignore<F>(&mut self, block: F)
+    where
+        F: Fn(&Observation<Self::Result>, &Observation<Self::Result>) -> bool;
 
-    fn cleaner(&mut self, block: Self::CleanerFn);
+    fn cleaner<F>(&mut self, block: F)
+    where
+        F: Fn(Self::Result);
 
     // fn publisher<T: Publisher<R> + 'a>(&mut self, publisher: T);
 
-    fn comparator(&mut self, block: Self::ComparatorFn);
+    fn comparator<F>(&mut self, block: F)
+    where
+        F: Fn(&Self::Result, &Self::Result) -> bool;
 
-    fn error_comparator(&mut self, block: Self::ErrorComparatorFn);
+    fn error_comparator<F>(&mut self, block: F)
+    where
+        F: Fn(&String, &String) -> bool;
 
     fn add_context(&mut self, context: Context);
 }
@@ -107,7 +120,8 @@ pub struct Experiment<'a, R: Clone + PartialEq> {
     pub cleaner: Option<CleanerBlock<R>>,
     pub enabled: EnabledFn,
     pub context: Context, // TODO: maybe AHashMap<String, Box<dyn Any>>, https://github.com/actix/actix-web/blob/7dc034f0fb70846d9bb3445a2414a142356892e1/actix-http/src/extensions.rs
-    ignores: Vec<IgnoresBlock<R>>, //Vec<fn(&Observation<R>, &Observation<R>) -> bool>, // TODO: might need to return Result<bool>
+    // ignores: Vec<IgnoresBlock<R>>, //Vec<fn(&Observation<R>, &Observation<R>) -> bool>, // TODO: might need to return Result<bool>
+    ignores: Vec<Box<dyn Fn(&Observation<R>, &Observation<R>) -> bool + 'a>>,
     pub err_on_mismatches: bool,
     comparator: Option<ValueComparator<R>>,
     error_comparator: Option<ErrorComparator>,
@@ -274,8 +288,11 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     /// * `ignore_block` - Function takes two arguments, the control observation an the candidate
     ///                    observation which didn't match the control. If the block returns true the
     ///                    mismatch is disregarded.
-    pub fn add_ignore(&mut self, ignore_block: IgnoresBlock<R>) {
-        self.ignores.push(ignore_block)
+    pub fn add_ignore<F>(&mut self, ignore_block: F)
+        where
+            F: Fn(&Observation<R>, &Observation<R>) -> bool + 'a
+    {
+        self.ignores.push(Box::from(ignore_block))
     }
 
     /// Ignore a mismatched observation
@@ -498,7 +515,10 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
     /// * `ignore_block` - Function takes two arguments, the control observation an the candidate
     ///                    observation which didn't match the control. If the block returns true the
     ///                    mismatch is disregarded.
-    pub fn add_ignore(&mut self, ignore_block: IgnoresBlock<R>) {
+    pub fn add_ignore<F>(&mut self, ignore_block: F)
+        where
+            F: Fn(&Observation<R>, &Observation<R>) -> bool + 'a
+    {
         self.experiment.add_ignore(ignore_block)
     }
 

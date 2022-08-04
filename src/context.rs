@@ -56,7 +56,7 @@ impl Context {
     /// source.insert("d", &4);
     /// target.extend(source);
     /// ```
-    pub fn extend(&mut self, mut source: Context) {
+    pub fn extend(&mut self, source: Context) {
         self.data.extend( source.data);
     }
 
