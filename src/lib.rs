@@ -27,6 +27,7 @@ mod tests {
     use std::{
         cell::{RefCell},
     };
+    use std::cell::Ref;
 
     use serde_json::{json, Value};
 
@@ -69,7 +70,24 @@ mod tests {
         assert_eq!(expected, result.unwrap_err());
     }
 
-    // TODO: custom enabled fn
+    #[test]
+    fn should_not_run_experiment_when_disabled() {
+        let called = RefCell::new(false);
+        let percent = 100;
+
+        let mut experiment = Experiment::default();
+        experiment.control(|| 1).unwrap();
+        experiment.candidate(|| {
+            called.replace(true);
+            1
+        }).unwrap();
+        experiment.enabled(|| { false });
+
+        let result = experiment.run().unwrap();
+
+        assert_eq!(1, result);
+        assert!(!called.take());
+    }
 
     #[test]
     fn should_allow_to_init_experiment_with_context() {
@@ -302,9 +320,38 @@ mod tests {
     // TODO: includes the experiments' results
     // TODO: formats nicely as a string
     // TODO: includes the backtrace when an observation raises
+    
+    #[test]
+    fn should_execute_before_run_when_experiment_is_enabled() {
+        let (control_ok, candidate_ok) = (RefCell::new(false), RefCell::new(false));
+        let before_run_called = RefCell::new(false);
 
-    // TODO: before run block
-    // TODO: does not run when an experiment is disabled
+        let mut experiment = Experiment::default();
+        experiment.before_run(|| { before_run_called.replace(true); });
+        experiment.control(|| { control_ok.replace(*before_run_called.borrow()); }).unwrap();
+        experiment.candidate(|| { candidate_ok.replace(*before_run_called.borrow()); }).unwrap();
+
+        let value = experiment.run().unwrap();
+
+        assert!(before_run_called.take());
+        assert!(control_ok.take());
+        assert!(candidate_ok.take());
+    }
+
+    #[test]
+    fn should_not_execute_before_run_when_experiment_is_disabled() {
+        let before_run_called = RefCell::new(false);
+
+        let mut experiment = Experiment::default();
+        experiment.enabled(|| { false });
+        experiment.before_run(|| { before_run_called.replace(true); });
+        experiment.control(|| { 1 }).unwrap();
+        experiment.candidate(|| { 1 }).unwrap();
+
+        let value = experiment.run().unwrap();
+
+        assert!(!before_run_called.take());
+    }
 
     fn create_observation(name: &'static str) -> Observation<u8> {
         return Observation::new(

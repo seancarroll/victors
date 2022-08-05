@@ -112,9 +112,9 @@ pub struct Experiment<'a, R: Clone + PartialEq> {
     /// Used to disable an experiment. If this returns false the experiment will merely return the
     /// control value. Otherwise it defers to the experiment's configured enabled method.
     pub run_if_block: Option<Box<dyn Fn() -> bool + 'a>>,
-    pub before_run_block: Option<BeforeRunBlock>,
+    pub before_run_block: Option<Box<dyn Fn() + 'a>>,
     pub cleaner: Option<CleanerBlock<R>>,
-    pub enabled: EnabledFn,
+    enabled: EnabledFn, // TODO: should this be a fn pointer or Fn?
     pub context: Context, /* TODO: maybe AHashMap<String, Box<dyn Any>>, https://github.com/actix/actix-web/blob/7dc034f0fb70846d9bb3445a2414a142356892e1/actix-http/src/extensions.rs */
     // ignores: Vec<IgnoresBlock<R>>, //Vec<fn(&Observation<R>, &Observation<R>) -> bool>, // TODO: might need to return Result<bool>
     ignores: Vec<Box<dyn Fn(&Observation<R>, &Observation<R>) -> bool + 'a>>,
@@ -236,8 +236,11 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     }
 
     /// Define a block of code to run before an experiment begins, if the experiment is enabled.
-    pub fn before_run(&mut self, f: BeforeRunBlock) {
-        self.before_run_block = Some(f)
+    pub fn before_run<F>(&mut self, f: F)
+    where
+        F: Fn() + 'a
+    {
+        self.before_run_block = Some(Box::new(f))
     }
 
     /// A block to clean an observed value for publishing or storing.
@@ -325,11 +328,11 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
         return a.equivalent_to(b, self.comparator, self.error_comparator);
     }
 
-    fn enabled(&mut self, enabled: fn() -> bool) {
+    pub fn enabled(&mut self, enabled: fn() -> bool) {
         self.enabled = enabled;
     }
 
-    fn is_enabled(&self) -> bool {
+    pub fn is_enabled(&self) -> bool {
         return (self.enabled)();
     }
 
@@ -485,7 +488,10 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
     }
 
     /// Define a block of code to run before an experiment begins, if the experiment is enabled.
-    pub fn before_run(&mut self, f: BeforeRunBlock) {
+    pub fn before_run<F>(&mut self, f: F)
+    where
+        F: Fn() + 'a
+    {
         self.experiment.before_run(f)
     }
 
