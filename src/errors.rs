@@ -63,6 +63,7 @@ pub enum VictorsErrors {
     NoValue(String),
 }
 
+#[rustfmt::skip]
 impl PartialEq for VictorsErrors {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {

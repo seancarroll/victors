@@ -196,8 +196,16 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
         }
     }
 
-    /// Register a named behavior for this experiment, default "candidate".
-    pub fn candidate<F>(&mut self, name: &str, f: F) -> VictorsResult<()>
+    /// Register a candidate behavior for this experiment, defaults name to "candidate".
+    pub fn candidate<F>(&mut self, f: F) -> VictorsResult<()>
+        where
+            F: Fn() -> R + 'a,
+    {
+        self.add_behavior(DEFAULT_CANDIDATE_NAME, f)
+    }
+
+    /// Register a named candidate behavior for this experiment.
+    pub fn candidate_with_name<F>(&mut self, name: &str, f: F) -> VictorsResult<()>
     where
         F: Fn() -> R + 'a,
     {
@@ -480,12 +488,12 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
         self.experiment.run_if_block_allows()
     }
 
-    /// Register a named behavior for this experiment, default "candidate".
+    /// Register a named candidate behavior for this experiment
     pub fn candidate<F>(&mut self, name: &str, f: F) -> VictorsResult<()>
     where
         F: Fn() -> R + 'a,
     {
-        self.experiment.candidate(name, f)
+        self.experiment.candidate_with_name(name, f)
     }
 
     /// Define a block of code to run before an experiment begins, if the experiment is enabled.

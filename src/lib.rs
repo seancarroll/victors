@@ -4,20 +4,20 @@
 #![feature(backtrace)]
 #![deny(elided_lifetimes_in_paths)]
 
-mod context;
+pub mod context;
 pub mod errors;
-mod experiment;
+pub mod experiment;
 pub mod experiment_result;
 pub mod observation;
 pub mod result_publisher;
 pub mod victor;
 
-// Library exports.
-pub use experiment_result::ExperimentResult;
-
+// TODO: can i use *?
+// https://github.com/SeaQL/sea-orm/blob/master/src/lib.rs
 pub use crate::{
     context::Context,
     experiment::{Experiment, UncontrolledExperiment},
+    experiment_result::ExperimentResult,
     observation::Observation,
     result_publisher::Publisher,
 };
@@ -48,9 +48,9 @@ mod tests {
     fn it_works() {
         let mut experiment = Experiment::default();
         experiment.control(|| println!("control...")).unwrap();
-        experiment.candidate("", || println!("candidate...")).unwrap();
+        experiment.candidate(|| println!("candidate...")).unwrap();
 
-        experiment.run();
+        experiment.run().unwrap();
     }
 
     #[test]
@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn should_return_error_when_controlled_experiment_has_no_control_behavior_defined() {
         let mut experiment = Experiment::default();
-        experiment.candidate("candidate", || 1).unwrap();
+        experiment.candidate(|| 1).unwrap();
         let result = experiment.run();
         let expected = VictorsErrors::BehaviorMissing(BehaviorMissing {
             experiment_name: "experiment".to_string(),
@@ -84,7 +84,7 @@ mod tests {
             Context::from_value(json!({"message": "hello world"})).unwrap(),
         );
         experiment.control(|| 1).unwrap();
-        experiment.candidate("candidate", || 1).unwrap();
+        experiment.candidate(|| 1).unwrap();
         experiment.result_publisher(InMemoryPublisher::new(|result| {
             r.replace(Some(result.clone()));
         }));
@@ -104,7 +104,7 @@ mod tests {
         let mut experiment = Experiment::default();
         experiment.add_context(Context::from_value(json!({"message": "hello world"})).unwrap());
         experiment.control(|| 1).unwrap();
-        experiment.candidate("candidate", || 1).unwrap();
+        experiment.candidate(|| 1).unwrap();
         experiment.result_publisher(InMemoryPublisher::new(|result| {
             r.replace(Some(result.clone()));
         }));
@@ -128,12 +128,10 @@ mod tests {
 
         let mut experiment = Experiment::default();
         experiment.control(|| 1).unwrap();
-        experiment
-            .candidate("candidate", || {
-                called.replace(true);
-                1
-            })
-            .unwrap();
+        experiment.candidate(|| {
+            called.replace(true);
+            1
+        }).unwrap();
         experiment.run_if(|| false);
 
         experiment.run().unwrap();
@@ -147,12 +145,10 @@ mod tests {
 
         let mut experiment = Experiment::default();
         experiment.control(|| 1).unwrap();
-        experiment
-            .candidate("candidate", || {
-                called.replace(true);
-                1
-            })
-            .unwrap();
+        experiment.candidate(|| {
+            called.replace(true);
+            1
+        }).unwrap();
         experiment.run_if(|| true);
 
         experiment.run().unwrap();
@@ -170,7 +166,7 @@ mod tests {
             // cannot use the `?` operator in a closure that returns `()`
             // I dont love it but I suppose thats part of the rust idioms
             experiment.control(|| 1)?;
-            experiment.candidate("candidate", || 2)?;
+            experiment.candidate(|| 2)?;
             Ok(())
         });
 
@@ -195,8 +191,8 @@ mod tests {
     fn should_return_non_unique_error_when_multiple_candidates_are_registered_with_same_name() {
         let mut experiment = Experiment::default();
         experiment.control(|| println!("control...")).unwrap();
-        experiment.candidate("candidate", || println!("candidate...")).unwrap();
-        let result = experiment.candidate("candidate", || println!("second candidate..."));
+        experiment.candidate(|| println!("candidate...")).unwrap();
+        let result = experiment.candidate(|| println!("second candidate..."));
         let expected = VictorsErrors::BehaviorNotUnique(BehaviorNotUnique {
             experiment_name: "experiment".to_string(),
             name: "candidate".to_string(),
@@ -259,18 +255,14 @@ mod tests {
         let r: RefCell<Option<ExperimentResult<TestResult>>> = RefCell::new(None);
 
         let mut experiment = Experiment::default();
-        experiment
-            .control(|| TestResult {
-                count: 1,
-                message: "control msg",
-            })
-            .unwrap();
-        experiment
-            .candidate("candidate", || TestResult {
-                count: 1,
-                message: "candidate msg",
-            })
-            .unwrap();
+        experiment.control(|| TestResult {
+            count: 1,
+            message: "control msg",
+        }).unwrap();
+        experiment.candidate(|| TestResult {
+            count: 1,
+            message: "candidate msg",
+        }).unwrap();
         experiment.comparator(|a, b| a.count == b.count);
         experiment.result_publisher(InMemoryPublisher::new(|result| {
             r.replace(Some(result.clone()));
