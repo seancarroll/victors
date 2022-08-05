@@ -106,7 +106,7 @@ pub struct Experiment<'a, R: Clone + PartialEq> {
     pub name: String,
 
     // TODO: probably need to have behaviors return results
-    behaviors: HashMap<String, BehaviorBlock<R>>,
+    behaviors: HashMap<String, Box<dyn Fn() -> R + 'a>>,
 
     // Sometimes you don't want an experiment to run. Say, disabling a new codepath for anyone
     // who isn't staff. You can disable an experiment by setting a run_if block.
@@ -115,7 +115,7 @@ pub struct Experiment<'a, R: Clone + PartialEq> {
 
     /// Used to disable an experiment. If this returns false the experiment will merely return the
     /// control value. Otherwise it defers to the experiment's configured enabled method.
-    pub run_if_block: Option<RunIfBlock>,
+    pub run_if_block: Option<Box<dyn Fn() -> bool + 'a>>,
     pub before_run_block: Option<BeforeRunBlock>,
     pub cleaner: Option<CleanerBlock<R>>,
     pub enabled: EnabledFn,
@@ -187,8 +187,11 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     }
 
     /// Define a block that determines whether or not the candidate experiments should run.
-    pub fn run_if(&mut self, block: RunIfBlock) {
-        self.run_if_block = Some(block);
+    pub fn run_if<F>(&mut self, block: F)
+    where
+        F: Fn() -> bool + 'a
+    {
+        self.run_if_block = Some(Box::new(block));
     }
 
     fn run_if_block_allows(&self) -> bool {
@@ -199,23 +202,32 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     }
 
     /// Register a named behavior for this experiment, default "candidate".
-    pub fn candidate(&mut self, name: &str, f: BehaviorBlock<R>) -> VictorsResult<()> {
+    pub fn candidate<F>(&mut self, name: &str, f: F) -> VictorsResult<()>
+    where
+        F: Fn() -> R + 'a
+    {
         self.add_behavior(name, f)
     }
 
     /// Register the control behavior for this experiment.
-    pub fn control(&mut self, f: BehaviorBlock<R>) -> VictorsResult<()> {
+    pub fn control<F>(&mut self, f: F) -> VictorsResult<()>
+    where
+        F: Fn() -> R + 'a
+    {
         self.add_behavior(CONTROL_NAME, f)
     }
 
-    fn add_behavior(&mut self, name: &str, f: BehaviorBlock<R>) -> VictorsResult<()> {
+    fn add_behavior<F>(&mut self, name: &str, f: F) -> VictorsResult<()>
+    where
+        F: Fn() -> R + 'a
+    {
         if self.behaviors.contains_key(name) {
             return Err(VictorsErrors::BehaviorNotUnique(BehaviorNotUnique {
                 experiment_name: (*&self.name).to_string(),
                 name: name.to_string(),
             }));
         }
-        self.behaviors.insert(name.to_string(), f);
+        self.behaviors.insert(name.to_string(), Box::new(f));
 
         return Ok(());
     }
@@ -292,7 +304,7 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
         where
             F: Fn(&Observation<R>, &Observation<R>) -> bool + 'a
     {
-        self.ignores.push(Box::from(ignore_block))
+        self.ignores.push(Box::new(ignore_block))
     }
 
     /// Ignore a mismatched observation
@@ -490,7 +502,10 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
     }
 
     /// Register a named behavior for this experiment, default "candidate".
-    pub fn candidate(&mut self, name: &str, f: BehaviorBlock<R>) -> VictorsResult<()> {
+    pub fn candidate<F>(&mut self, name: &str, f: F) -> VictorsResult<()>
+    where
+        F: Fn() -> R + 'a
+    {
         self.experiment.candidate(name, f)
     }
 

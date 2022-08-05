@@ -74,7 +74,7 @@ mod tests {
         experiment.control(|| { 1 }).unwrap();
         experiment.candidate("candidate", || { 1 }).unwrap();
         experiment.result_publisher(InMemoryPublisher::new(|result| {
-            r.swap(&RefCell::new(Some(result.clone())));
+            r.replace(Some(result.clone()));
         }));
 
         let result = experiment.run().unwrap();
@@ -94,7 +94,7 @@ mod tests {
         experiment.control(|| { 1 }).unwrap();
         experiment.candidate("candidate", || { 1 }).unwrap();
         experiment.result_publisher(InMemoryPublisher::new(|result| {
-            r.swap(&RefCell::new(Some(result.clone())));
+            r.replace(Some(result.clone()));
         }));
 
         let result = experiment.run().unwrap();
@@ -113,42 +113,30 @@ mod tests {
     // the language or not
     #[test]
     fn should_not_run_candidates_when_run_if_returns_false() {
-        let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
-        // let mut v = false;
+        let called = RefCell::new(false);
+
         let mut experiment = Experiment::default();
         experiment.control(|| { 1 }).unwrap();
-        experiment.candidate("candidate", || { 1 }).unwrap();
+        experiment.candidate("candidate", || { called.replace(true); 1 }).unwrap();
         experiment.run_if(|| { false });
-        experiment.result_publisher(InMemoryPublisher::new(|result| {
-            r.swap(&RefCell::new(Some(result.clone())));
-        }));
 
         let result = experiment.run().unwrap();
 
-        // assert_eq!(1, result);
-        // let missing_candidate = r.take().unwrap().observations.iter()
-        //     .find(|o| o.name == "candidate").is_none();
-        // assert!(missing_candidate);
+        assert!(!called.take());
     }
 
     #[test]
     fn should_run_candidates_when_run_if_returns_true() {
-        let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
-        // let mut v = false;
+        let called = RefCell::new(false);
+
         let mut experiment = Experiment::default();
         experiment.control(|| { 1 }).unwrap();
-        experiment.candidate("candidate", || { 1 }).unwrap();
+        experiment.candidate("candidate", || { called.replace(true);  1 }).unwrap();
         experiment.run_if(|| { true });
-        experiment.result_publisher(InMemoryPublisher::new(|result| {
-            r.swap(&RefCell::new(Some(result.clone())));
-        }));
 
         let result = experiment.run().unwrap();
 
-        // assert_eq!(1, result);
-        // let has_candidate = r.take().unwrap().observations.iter()
-        //     .find(|o| o.name == "candidate").is_some();
-        // assert!(has_candidate);
+        assert!(called.take());
     }
 
 
@@ -210,9 +198,9 @@ mod tests {
         // let mut called_one = false;
 
         let mut experiment = Experiment::default();
-        experiment.add_ignore(|a, b| { called_one.swap(&RefCell::new(true)); false });
-        experiment.add_ignore(|a, b| { called_two.swap(&RefCell::new(true)); true });
-        experiment.add_ignore(|a, b| { called_three.swap(&RefCell::new(true)); false });
+        experiment.add_ignore(|a, b| { called_one.replace(true); false });
+        experiment.add_ignore(|a, b| { called_two.replace(true); true });
+        experiment.add_ignore(|a, b| { called_three.replace(true); false });
 
         let a = create_observation("a");
         let b = create_observation("b");
@@ -249,7 +237,7 @@ mod tests {
         experiment.candidate("candidate", || TestResult { count: 1, message: "candidate msg"}).unwrap();
         experiment.comparator(|a, b| { a.count == b.count });
         experiment.result_publisher(InMemoryPublisher::new(|result| {
-            r.swap(&RefCell::new(Some(result.clone())));
+            r.replace(Some(result.clone()));
         }));
 
         let value = experiment.run().unwrap();
