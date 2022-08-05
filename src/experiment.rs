@@ -198,8 +198,8 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
 
     /// Register a candidate behavior for this experiment, defaults name to "candidate".
     pub fn candidate<F>(&mut self, f: F) -> VictorsResult<()>
-        where
-            F: Fn() -> R + 'a,
+    where
+        F: Fn() -> R + 'a,
     {
         self.add_behavior(DEFAULT_CANDIDATE_NAME, f)
     }
@@ -317,19 +317,7 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
             return false;
         }
 
-        // for n in 1..self.ignores.len() {
-        //     if self.ignores[n](&control, &candidate) {
-        //         return true;
-        //     }
-        // }
-
         return self.ignores.iter().any(|ignore| ignore(&control, &candidate));
-        // for ignore in &self.ignores {
-        //     if ignore(&control, &candidate) {
-        //         return true;
-        //     }
-        // }
-        // return false;
     }
 
     // TODO: does this need to return a result?

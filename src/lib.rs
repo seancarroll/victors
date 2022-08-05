@@ -25,11 +25,7 @@ pub use crate::{
 #[cfg(test)]
 mod tests {
     use std::{
-        borrow::Borrow,
-        cell::{Ref, RefCell},
-        collections::HashMap,
-        pin::Pin,
-        rc::Rc,
+        cell::{RefCell},
     };
 
     use serde_json::{json, Value};
@@ -311,6 +307,12 @@ mod tests {
     // TODO: does not run when an experiment is disabled
 
     fn create_observation(name: &'static str) -> Observation<u8> {
-        return Observation::new(name.to_string(), "experiment".to_string(), 1, None, 1);
+        return Observation::new(
+            name.to_string(),
+            "experiment".to_string(),
+            1,
+            None,
+            1
+        );
     }
 }
