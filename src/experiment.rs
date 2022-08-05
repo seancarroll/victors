@@ -9,9 +9,9 @@ use crate::observation::Observation;
 use crate::result_publisher::{NoopPublisher, Publisher};
 
 
-static CONTROL_NAME: &str = "control";
-static DEFAULT_CANDIDATE_NAME: &str = "candidate";
-static DEFAULT_EXPERIMENT_NAME: &str = "experiment";
+const CONTROL_NAME: &str = "control";
+const DEFAULT_CANDIDATE_NAME: &str = "candidate";
+const DEFAULT_EXPERIMENT_NAME: &str = "experiment";
 
 pub trait Experimentation
 {
@@ -100,8 +100,6 @@ type ErrorComparator = fn(a: &String, b: &String) -> bool;
 // type PublisherBlock<R> = Box<dyn Publisher<ExperimentResult<R>>>;
 // type PublisherBlock<R> = fn(result: &ExperimentResult<R>);
 
-// TODO: make context a struct?
-
 pub struct Experiment<'a, R: Clone + PartialEq> {
     pub name: String,
 
@@ -125,7 +123,7 @@ pub struct Experiment<'a, R: Clone + PartialEq> {
     pub err_on_mismatches: bool,
     comparator: Option<ValueComparator<R>>,
     error_comparator: Option<ErrorComparator>,
-    pub publisher: Box<dyn Publisher<R> + 'a>,
+    pub publisher: Box<dyn Publisher<R> + 'a>, // TODO: make this an Option
 }
 
 // impl<F: FnOnce(&Observation<R>, &Observation<R>) -> bool, R: Clone + PartialEq> Experimentation<F, R> for Experiment<R> {

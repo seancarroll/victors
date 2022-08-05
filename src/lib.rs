@@ -4,17 +4,25 @@
 #![feature(backtrace)]
 #![deny(elided_lifetimes_in_paths)]
 
-mod errors;
+pub mod errors;
 mod experiment;
-mod experiment_result;
-mod observation;
-mod victor;
-mod result_publisher;
+pub mod experiment_result;
+pub mod observation;
+pub mod victor;
+pub mod result_publisher;
 mod context;
 
 // Library exports.
 pub use crate::context::Context;
-// TODO: confirm what is being exported
+pub use crate::experiment::{
+    Experiment,
+    UncontrolledExperiment
+};
+pub use experiment_result::ExperimentResult;
+pub use crate::observation::Observation;
+pub use crate::result_publisher:: {
+    Publisher
+};
 
 #[cfg(test)]
 mod tests {
@@ -38,7 +46,7 @@ mod tests {
         experiment.control(|| { println!("control...")}).unwrap();
         experiment.candidate("", || { println!("candidate...") }).unwrap();
 
-        let result = experiment.run();
+        experiment.run();
     }
 
     #[test]
@@ -77,7 +85,7 @@ mod tests {
             r.replace(Some(result.clone()));
         }));
 
-        let result = experiment.run().unwrap();
+        experiment.run().unwrap();
 
         assert_eq!(
             r.take().unwrap().context.get(&"message".to_string()),
@@ -97,7 +105,7 @@ mod tests {
             r.replace(Some(result.clone()));
         }));
 
-        let result = experiment.run().unwrap();
+        experiment.run().unwrap();
 
         assert_eq!(
             r.take().unwrap().context.get(&"message".to_string()),
@@ -120,7 +128,7 @@ mod tests {
         experiment.candidate("candidate", || { called.replace(true); 1 }).unwrap();
         experiment.run_if(|| { false });
 
-        let result = experiment.run().unwrap();
+        experiment.run().unwrap();
 
         assert!(!called.take());
     }
@@ -134,7 +142,7 @@ mod tests {
         experiment.candidate("candidate", || { called.replace(true);  1 }).unwrap();
         experiment.run_if(|| { true });
 
-        let result = experiment.run().unwrap();
+        experiment.run().unwrap();
 
         assert!(called.take());
     }
@@ -198,9 +206,9 @@ mod tests {
         // let mut called_one = false;
 
         let mut experiment = Experiment::default();
-        experiment.add_ignore(|a, b| { called_one.replace(true); false });
-        experiment.add_ignore(|a, b| { called_two.replace(true); true });
-        experiment.add_ignore(|a, b| { called_three.replace(true); false });
+        experiment.add_ignore(|_a, _b| { called_one.replace(true); false });
+        experiment.add_ignore(|_a, _b| { called_two.replace(true); true });
+        experiment.add_ignore(|_a, _b| { called_three.replace(true); false });
 
         let a = create_observation("a");
         let b = create_observation("b");

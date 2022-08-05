@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use crate::context::Context;
 use crate::experiment::Experiment;
 use crate::observation::Observation;

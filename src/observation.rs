@@ -1,5 +1,4 @@
 use crate::errors::VictorsErrors;
-use crate::experiment::Experiment;
 
 // Observation really only needs experiment to get cleaned value.
 // instead of passing in experiment and calling into it to get clean_value
