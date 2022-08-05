@@ -4,47 +4,51 @@
 #![feature(backtrace)]
 #![deny(elided_lifetimes_in_paths)]
 
+mod context;
 pub mod errors;
 mod experiment;
 pub mod experiment_result;
 pub mod observation;
-pub mod victor;
 pub mod result_publisher;
-mod context;
+pub mod victor;
 
 // Library exports.
-pub use crate::context::Context;
-pub use crate::experiment::{
-    Experiment,
-    UncontrolledExperiment
-};
 pub use experiment_result::ExperimentResult;
-pub use crate::observation::Observation;
-pub use crate::result_publisher:: {
-    Publisher
+
+pub use crate::{
+    context::Context,
+    experiment::{Experiment, UncontrolledExperiment},
+    observation::Observation,
+    result_publisher::Publisher,
 };
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Borrow;
-    use std::cell::{Ref, RefCell};
-    use std::collections::HashMap;
-    use std::pin::Pin;
-    use std::rc::Rc;
+    use std::{
+        borrow::Borrow,
+        cell::{Ref, RefCell},
+        collections::HashMap,
+        pin::Pin,
+        rc::Rc,
+    };
+
     use serde_json::{json, Value};
-    use crate::context::Context;
-    use crate::errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult};
-    use crate::experiment::Experiment;
-    use crate::experiment_result::ExperimentResult;
-    use crate::observation::Observation;
-    use crate::result_publisher::InMemoryPublisher;
-    use crate::victor::Victor;
+
+    use crate::{
+        context::Context,
+        errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult},
+        experiment::Experiment,
+        experiment_result::ExperimentResult,
+        observation::Observation,
+        result_publisher::InMemoryPublisher,
+        victor::Victor,
+    };
 
     #[test]
     fn it_works() {
         let mut experiment = Experiment::default();
-        experiment.control(|| { println!("control...")}).unwrap();
-        experiment.candidate("", || { println!("candidate...") }).unwrap();
+        experiment.control(|| println!("control...")).unwrap();
+        experiment.candidate("", || println!("candidate...")).unwrap();
 
         experiment.run();
     }
@@ -52,7 +56,7 @@ mod tests {
     #[test]
     fn should_be_able_to_specify_control_name() {
         let mut experiment = Experiment::new("custom control");
-        experiment.control(|| { println!("control...")}).unwrap();
+        experiment.control(|| println!("control...")).unwrap();
 
         assert_eq!("custom control", experiment.name);
     }
@@ -60,11 +64,11 @@ mod tests {
     #[test]
     fn should_return_error_when_controlled_experiment_has_no_control_behavior_defined() {
         let mut experiment = Experiment::default();
-        experiment.candidate("candidate", || { 1 }).unwrap();
+        experiment.candidate("candidate", || 1).unwrap();
         let result = experiment.run();
         let expected = VictorsErrors::BehaviorMissing(BehaviorMissing {
             experiment_name: "experiment".to_string(),
-            name: "control".to_string()
+            name: "control".to_string(),
         });
         assert_eq!(expected, result.unwrap_err());
     }
@@ -77,10 +81,10 @@ mod tests {
 
         let mut experiment = Experiment::new_with_context(
             "experiment",
-            Context::from_value(json!({"message": "hello world"})).unwrap()
+            Context::from_value(json!({"message": "hello world"})).unwrap(),
         );
-        experiment.control(|| { 1 }).unwrap();
-        experiment.candidate("candidate", || { 1 }).unwrap();
+        experiment.control(|| 1).unwrap();
+        experiment.candidate("candidate", || 1).unwrap();
         experiment.result_publisher(InMemoryPublisher::new(|result| {
             r.replace(Some(result.clone()));
         }));
@@ -99,8 +103,8 @@ mod tests {
 
         let mut experiment = Experiment::default();
         experiment.add_context(Context::from_value(json!({"message": "hello world"})).unwrap());
-        experiment.control(|| { 1 }).unwrap();
-        experiment.candidate("candidate", || { 1 }).unwrap();
+        experiment.control(|| 1).unwrap();
+        experiment.candidate("candidate", || 1).unwrap();
         experiment.result_publisher(InMemoryPublisher::new(|result| {
             r.replace(Some(result.clone()));
         }));
@@ -116,7 +120,6 @@ mod tests {
     // TODO: publish
     // TODO: clean values
 
-
     // TODO: run_if - run "experiment" means candidates but not sure if we really need to change
     // the language or not
     #[test]
@@ -124,9 +127,14 @@ mod tests {
         let called = RefCell::new(false);
 
         let mut experiment = Experiment::default();
-        experiment.control(|| { 1 }).unwrap();
-        experiment.candidate("candidate", || { called.replace(true); 1 }).unwrap();
-        experiment.run_if(|| { false });
+        experiment.control(|| 1).unwrap();
+        experiment
+            .candidate("candidate", || {
+                called.replace(true);
+                1
+            })
+            .unwrap();
+        experiment.run_if(|| false);
 
         experiment.run().unwrap();
 
@@ -138,19 +146,22 @@ mod tests {
         let called = RefCell::new(false);
 
         let mut experiment = Experiment::default();
-        experiment.control(|| { 1 }).unwrap();
-        experiment.candidate("candidate", || { called.replace(true);  1 }).unwrap();
-        experiment.run_if(|| { true });
+        experiment.control(|| 1).unwrap();
+        experiment
+            .candidate("candidate", || {
+                called.replace(true);
+                1
+            })
+            .unwrap();
+        experiment.run_if(|| true);
 
         experiment.run().unwrap();
 
         assert!(called.take());
     }
 
-
     // TODO: parallel
     // TODO: before_run setup
-
 
     #[test]
     fn should_be_able_to_create_and_run_experiment_via_victor() {
@@ -158,8 +169,8 @@ mod tests {
             // To fix the error below means we need to return Ok(()) at the end
             // cannot use the `?` operator in a closure that returns `()`
             // I dont love it but I suppose thats part of the rust idioms
-            experiment.control(|| { 1 })?;
-            experiment.candidate("candidate", || { 2 })?;
+            experiment.control(|| 1)?;
+            experiment.candidate("candidate", || 2)?;
             Ok(())
         });
 
@@ -172,8 +183,8 @@ mod tests {
             // To fix the error below means we need to return Ok(()) at the end
             // cannot use the `?` operator in a closure that returns `()`
             // I dont love it but I suppose thats part of the rust idioms
-            experiment.candidate("first", || { 1 })?;
-            experiment.candidate("second", || { 2 })?;
+            experiment.candidate("first", || 1)?;
+            experiment.candidate("second", || 2)?;
             Ok(())
         });
 
@@ -183,16 +194,15 @@ mod tests {
     #[test]
     fn should_return_non_unique_error_when_multiple_candidates_are_registered_with_same_name() {
         let mut experiment = Experiment::default();
-        experiment.control(|| { println!("control...")}).unwrap();
-        experiment.candidate("candidate", || { println!("candidate...") }).unwrap();
-        let result = experiment.candidate("candidate", || { println!("second candidate...") });
+        experiment.control(|| println!("control...")).unwrap();
+        experiment.candidate("candidate", || println!("candidate...")).unwrap();
+        let result = experiment.candidate("candidate", || println!("second candidate..."));
         let expected = VictorsErrors::BehaviorNotUnique(BehaviorNotUnique {
             experiment_name: "experiment".to_string(),
-            name: "candidate".to_string()
+            name: "candidate".to_string(),
         });
         assert_eq!(expected, result.unwrap_err());
     }
-
 
     // ignore ignore_mismatched_observation tests
     // TODO: does not ignore an observation if no ignores are configured
@@ -201,14 +211,22 @@ mod tests {
     fn should_call_ignore_blocks_until_match() {
         // TODO: using RefCell seems like a hack. I can't figure out how to just mutate a boolean
         // captured variable. All three types (Fn, FnOnce, FnMut) are problematic for various reasons
-        let (called_one, called_two, called_three)
-            = (RefCell::new(false), RefCell::new(false), RefCell::new(false));
+        let (called_one, called_two, called_three) = (RefCell::new(false), RefCell::new(false), RefCell::new(false));
         // let mut called_one = false;
 
         let mut experiment = Experiment::default();
-        experiment.add_ignore(|_a, _b| { called_one.replace(true); false });
-        experiment.add_ignore(|_a, _b| { called_two.replace(true); true });
-        experiment.add_ignore(|_a, _b| { called_three.replace(true); false });
+        experiment.add_ignore(|_a, _b| {
+            called_one.replace(true);
+            false
+        });
+        experiment.add_ignore(|_a, _b| {
+            called_two.replace(true);
+            true
+        });
+        experiment.add_ignore(|_a, _b| {
+            called_three.replace(true);
+            false
+        });
 
         let a = create_observation("a");
         let b = create_observation("b");
@@ -235,15 +253,25 @@ mod tests {
         #[derive(Clone, PartialEq)]
         struct TestResult {
             count: u8,
-            message: &'static str
+            message: &'static str,
         }
 
         let r: RefCell<Option<ExperimentResult<TestResult>>> = RefCell::new(None);
 
         let mut experiment = Experiment::default();
-        experiment.control(|| { TestResult { count: 1, message: "control msg"} }).unwrap();
-        experiment.candidate("candidate", || TestResult { count: 1, message: "candidate msg"}).unwrap();
-        experiment.comparator(|a, b| { a.count == b.count });
+        experiment
+            .control(|| TestResult {
+                count: 1,
+                message: "control msg",
+            })
+            .unwrap();
+        experiment
+            .candidate("candidate", || TestResult {
+                count: 1,
+                message: "candidate msg",
+            })
+            .unwrap();
+        experiment.comparator(|a, b| a.count == b.count);
         experiment.result_publisher(InMemoryPublisher::new(|result| {
             r.replace(Some(result.clone()));
         }));
@@ -254,7 +282,6 @@ mod tests {
         assert!(r.take().unwrap().matched());
     }
 
-
     // TODO: knows how to compare two experiments
     // TODO: uses a compare block to determine if observations are equivalent
     // TODO: reports errors in a compare block
@@ -263,7 +290,6 @@ mod tests {
     // TODO: returns the given value when no clean block is configured
     // TODO: calls the configured clean block with a value when configured
     // TODO: reports an error and returns the original value when an error is raised in a clean block
-
 
     // TODO: calls multiple ignore blocks to see if any match
     // TODO: only calls ignore blocks until one matches
@@ -277,13 +303,11 @@ mod tests {
     // TODO: "raises a mismatch error if the control raises and candidate doesn't"
     // TODO: "raises a mismatch error if the candidate raises and the control doesn't"
 
-
     // TODO: can be marshaled
 
     // TODO: raise_on_mismatches
     // TODO: raises when there is a mismatch if the experiment instance's raise on mismatches is enabled
     // TODO: doesn't raise when there is a mismatch if the experiment instance's raise on mismatches is disabled
-
 
     // TODO: MismatchError
     // TODO: has the name of the experiment
@@ -294,14 +318,7 @@ mod tests {
     // TODO: before run block
     // TODO: does not run when an experiment is disabled
 
-
-
     fn create_observation(name: &'static str) -> Observation<u8> {
-        return Observation::new(
-            name.to_string(),
-            "experiment".to_string(),
-            1,
-            None,
-            1);
+        return Observation::new(name.to_string(), "experiment".to_string(), 1, None, 1);
     }
 }

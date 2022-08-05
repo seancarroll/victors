@@ -1,11 +1,12 @@
-use crate::errors::VictorsResult;
-use crate::experiment::{Experiment, UncontrolledExperiment};
+use crate::{
+    errors::VictorsResult,
+    experiment::{Experiment, UncontrolledExperiment},
+};
 
 pub struct Victor;
 
 /// Helper that will instantiate and experiment and call run for you
 impl Victor {
-
     /// Define and run a controlled experiment.
     ///
     /// # Arguments
@@ -15,8 +16,8 @@ impl Victor {
     /// # Return
     /// Returns the calculated value of the control experiment or error
     pub fn conduct<F, R: Clone + PartialEq>(name: &'static str, experiment_block: F) -> VictorsResult<R>
-        where
-            F: Fn(&mut Experiment<'_, R>) -> VictorsResult<()>
+    where
+        F: Fn(&mut Experiment<'_, R>) -> VictorsResult<()>,
     {
         let mut experiment = Experiment::new(name);
         experiment_block(&mut experiment)?;
@@ -36,10 +37,10 @@ impl Victor {
     pub fn conduct_uncontrolled<F, R: Clone + PartialEq>(
         name: &'static str,
         return_candidate_result: &'static str,
-        experiment_block: F
+        experiment_block: F,
     ) -> VictorsResult<R>
-        where
-            F: Fn(&mut UncontrolledExperiment<'_, R>) -> VictorsResult<()>
+    where
+        F: Fn(&mut UncontrolledExperiment<'_, R>) -> VictorsResult<()>,
     {
         let mut experiment = UncontrolledExperiment::new(name);
         experiment_block(&mut experiment)?;

@@ -11,7 +11,7 @@ use crate::errors::VictorsErrors;
 // TODO: should R also include Copy?
 /// What happened when this named behavior was executed? Immutable.
 #[derive(Clone, PartialEq)]
-pub struct Observation<R: Clone + PartialEq>  {
+pub struct Observation<R: Clone + PartialEq> {
     /// The experiment this observation is for
     pub experiment_name: String,
     /// name of the behavior
@@ -20,27 +20,20 @@ pub struct Observation<R: Clone + PartialEq>  {
     /// cleaned value suitable for publishing. See [Experiment::cleaner] block. None if no cleaner
     pub cleaned_value: Option<R>, // TODO: what type should this be?
     // pub exception: Option<VictorsErrors>,
-    pub duration: u128
+    pub duration: u128,
 }
 
 impl<R: Clone + PartialEq> Observation<R> {
-
     // TODO: pass in lambda/function block which is executed and duration/value returned
-    pub fn new(
-        name: String,
-        experiment_name: String,
-        value: R,
-        cleaned_value: Option<R>,
-        duration: u128
-    ) -> Self {
+    pub fn new(name: String, experiment_name: String, value: R, cleaned_value: Option<R>, duration: u128) -> Self {
         return Self {
             name,
             value,
             cleaned_value,
             // exception: None,
             experiment_name,
-            duration
-        }
+            duration,
+        };
     }
 
     pub fn clean_value() {
@@ -54,7 +47,7 @@ impl<R: Clone + PartialEq> Observation<R> {
         &self,
         other: &Observation<R>,
         comparator: Option<fn(a: &R, b: &R) -> bool>,
-        error_comparator: Option<fn(a: &String, b: &String) -> bool>
+        error_comparator: Option<fn(a: &String, b: &String) -> bool>,
     ) -> bool {
         // TODO: check raise // error
         // if let (Some(exception),  Some(other_exception)) = (&self.exception, &other.exception) {
@@ -69,6 +62,6 @@ impl<R: Clone + PartialEq> Observation<R> {
             comparator(&self.value, &other.value)
         } else {
             self.value == other.value
-        }
+        };
     }
 }

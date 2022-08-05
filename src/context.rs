@@ -1,7 +1,9 @@
 // This was based on Tera's Context. See https://github.com/Keats/tera
 use std::collections::HashMap;
+
 use serde::ser::Serialize;
-use serde_json::{Map, to_value, Value};
+use serde_json::{to_value, Map, Value};
+
 use crate::errors::{VictorsErrors, VictorsResult};
 
 /// The struct that holds the context of an experiment.
@@ -34,11 +36,7 @@ impl Context {
     /// Converts the `val` parameter to `Value` and insert it into the context.
     ///
     /// Returns an error if the serialization fails.
-    pub fn try_insert<S: Into<String>, T: Serialize + ?Sized>(
-        &mut self,
-        key: S,
-        val: &T,
-    ) -> VictorsResult<()> {
+    pub fn try_insert<S: Into<String>, T: Serialize + ?Sized>(&mut self, key: S, val: &T) -> VictorsResult<()> {
         self.data.insert(key.into(), to_value(val)?);
         Ok(())
     }
@@ -57,7 +55,7 @@ impl Context {
     /// target.extend(source);
     /// ```
     pub fn extend(&mut self, source: Context) {
-        self.data.extend( source.data);
+        self.data.extend(source.data);
     }
 
     /// Converts the context to a `serde_json::Value` consuming the context.

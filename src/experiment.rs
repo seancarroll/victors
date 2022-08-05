@@ -1,20 +1,20 @@
-use std::collections::HashMap;
-use std::time::Instant;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
-use crate::context::Context;
-use crate::errors::{BehaviorMissing, BehaviorNotUnique, MismatchError, VictorsErrors, VictorsResult};
-use crate::experiment_result::ExperimentResult;
-use crate::observation::Observation;
-use crate::result_publisher::{NoopPublisher, Publisher};
+use std::{collections::HashMap, time::Instant};
 
+use rand::{seq::SliceRandom, thread_rng};
+
+use crate::{
+    context::Context,
+    errors::{BehaviorMissing, BehaviorNotUnique, MismatchError, VictorsErrors, VictorsResult},
+    experiment_result::ExperimentResult,
+    observation::Observation,
+    result_publisher::{NoopPublisher, Publisher},
+};
 
 const CONTROL_NAME: &str = "control";
 const DEFAULT_CANDIDATE_NAME: &str = "candidate";
 const DEFAULT_EXPERIMENT_NAME: &str = "experiment";
 
-pub trait Experimentation
-{
+pub trait Experimentation {
     type Result;
 
     // type T: Display = String;
@@ -80,7 +80,6 @@ pub trait Experimentation
 //     fn should_experiment_run(&self) -> bool;
 // }
 
-
 // TODO: do we want to rename Experiment to ControlledExperiment
 // Then make Experiment a trait (or Experimentation).
 
@@ -110,14 +109,13 @@ pub struct Experiment<'a, R: Clone + PartialEq> {
     // who isn't staff. You can disable an experiment by setting a run_if block.
     // If this returns false, the experiment will merely return the control value.
     // Otherwise, it defers to the experiment's configured enabled? method.
-
     /// Used to disable an experiment. If this returns false the experiment will merely return the
     /// control value. Otherwise it defers to the experiment's configured enabled method.
     pub run_if_block: Option<Box<dyn Fn() -> bool + 'a>>,
     pub before_run_block: Option<BeforeRunBlock>,
     pub cleaner: Option<CleanerBlock<R>>,
     pub enabled: EnabledFn,
-    pub context: Context, // TODO: maybe AHashMap<String, Box<dyn Any>>, https://github.com/actix/actix-web/blob/7dc034f0fb70846d9bb3445a2414a142356892e1/actix-http/src/extensions.rs
+    pub context: Context, /* TODO: maybe AHashMap<String, Box<dyn Any>>, https://github.com/actix/actix-web/blob/7dc034f0fb70846d9bb3445a2414a142356892e1/actix-http/src/extensions.rs */
     // ignores: Vec<IgnoresBlock<R>>, //Vec<fn(&Observation<R>, &Observation<R>) -> bool>, // TODO: might need to return Result<bool>
     ignores: Vec<Box<dyn Fn(&Observation<R>, &Observation<R>) -> bool + 'a>>,
     pub err_on_mismatches: bool,
@@ -133,7 +131,6 @@ pub struct Experiment<'a, R: Clone + PartialEq> {
 // }
 
 impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
-
     /// Creates a new experiment with the name "experiment"
     pub fn default() -> Self {
         return Experiment::new(DEFAULT_EXPERIMENT_NAME);
@@ -150,15 +147,15 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
             run_if_block: None,
             before_run_block: None,
             cleaner: None,
-            enabled: || { true },
+            enabled: || true,
             context: Default::default(),
             ignores: vec![],
             err_on_mismatches: false,
             comparator: None,
             error_comparator: None,
             // publisher: |result| {}
-            publisher: Box::new(NoopPublisher{}),
-        }
+            publisher: Box::new(NoopPublisher {}),
+        };
     }
 
     /// Creates a new experiment with initial context
@@ -173,21 +170,21 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
             run_if_block: None,
             before_run_block: None,
             cleaner: None,
-            enabled: || { true },
+            enabled: || true,
             context,
             ignores: vec![],
             err_on_mismatches: false,
             comparator: None,
             error_comparator: None,
             // publisher: |result| {}
-            publisher: Box::new(NoopPublisher{})
-        }
+            publisher: Box::new(NoopPublisher {}),
+        };
     }
 
     /// Define a block that determines whether or not the candidate experiments should run.
     pub fn run_if<F>(&mut self, block: F)
     where
-        F: Fn() -> bool + 'a
+        F: Fn() -> bool + 'a,
     {
         self.run_if_block = Some(Box::new(block));
     }
@@ -202,7 +199,7 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     /// Register a named behavior for this experiment, default "candidate".
     pub fn candidate<F>(&mut self, name: &str, f: F) -> VictorsResult<()>
     where
-        F: Fn() -> R + 'a
+        F: Fn() -> R + 'a,
     {
         self.add_behavior(name, f)
     }
@@ -210,14 +207,14 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     /// Register the control behavior for this experiment.
     pub fn control<F>(&mut self, f: F) -> VictorsResult<()>
     where
-        F: Fn() -> R + 'a
+        F: Fn() -> R + 'a,
     {
         self.add_behavior(CONTROL_NAME, f)
     }
 
     fn add_behavior<F>(&mut self, name: &str, f: F) -> VictorsResult<()>
     where
-        F: Fn() -> R + 'a
+        F: Fn() -> R + 'a,
     {
         if self.behaviors.contains_key(name) {
             return Err(VictorsErrors::BehaviorNotUnique(BehaviorNotUnique {
@@ -241,7 +238,6 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
         self.cleaner = Some(f)
     }
 
-
     fn generate_result(&self, name: String) -> VictorsResult<ExperimentResult<R>> {
         let mut observations = vec![];
         let mut observation_to_return_index = None;
@@ -261,7 +257,7 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
                     self.name.to_string(),
                     behavior_results,
                     None,
-                    duration.as_millis()
+                    duration.as_millis(),
                 );
 
                 observations.push(observation);
@@ -272,19 +268,11 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
         }
 
         match observation_to_return_index {
-            None => {
-                Err(VictorsErrors::BehaviorMissing(BehaviorMissing {
-                    experiment_name: self.name.to_string(),
-                    name
-                }))
-            }
-            Some(o) => {
-                Ok(ExperimentResult::new(
-                    &self,
-                    observations,
-                    o
-                ))
-            }
+            None => Err(VictorsErrors::BehaviorMissing(BehaviorMissing {
+                experiment_name: self.name.to_string(),
+                name,
+            })),
+            Some(o) => Ok(ExperimentResult::new(&self, observations, o)),
         }
     }
 
@@ -299,8 +287,8 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     ///                    observation which didn't match the control. If the block returns true the
     ///                    mismatch is disregarded.
     pub fn add_ignore<F>(&mut self, ignore_block: F)
-        where
-            F: Fn(&Observation<R>, &Observation<R>) -> bool + 'a
+    where
+        F: Fn(&Observation<R>, &Observation<R>) -> bool + 'a,
     {
         self.ignores.push(Box::new(ignore_block))
     }
@@ -316,11 +304,7 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     ///
     /// # Return
     /// whether or not to ignore mismatch observation
-    pub fn ignore_mismatch_observation(
-        &self,
-        control: &Observation<R>,
-        candidate: &Observation<R>
-    ) -> bool {
+    pub fn ignore_mismatch_observation(&self, control: &Observation<R>, candidate: &Observation<R>) -> bool {
         if self.ignores.is_empty() {
             return false;
         }
@@ -417,7 +401,7 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
                 experiment_name: self.name.to_string(),
                 exception: None,
                 message: "".to_string(),
-                backtrace: None
+                backtrace: None,
             }));
         }
 
@@ -430,7 +414,6 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
         // TODO: fix unwrap
         return Ok(result.control().unwrap().value.to_owned());
     }
-
 
     fn should_experiment_run(&self) -> bool {
         return self.behaviors.len() > 1 && self.is_enabled() && self.run_if_block_allows();
@@ -458,20 +441,18 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     pub fn error_comparator(&mut self, comparator: ErrorComparator) {
         self.error_comparator = Some(comparator);
     }
-
 }
 
 pub struct UncontrolledExperiment<'a, R: Clone + PartialEq> {
-    experiment: Experiment<'a, R>
+    experiment: Experiment<'a, R>,
 }
 
 impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
-
     /// Creates a new experiment with the name "experiment"
     pub fn default() -> Self {
         return Self {
-            experiment: Experiment::default()
-        }
+            experiment: Experiment::default(),
+        };
     }
 
     /// Creates a new experiment
@@ -480,8 +461,8 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
     /// * `name` - the name of the experiment
     pub fn new(name: &'static str) -> Self {
         return Self {
-            experiment: Experiment::new(name)
-        }
+            experiment: Experiment::new(name),
+        };
     }
 
     /// Creates a new experiment with initial context
@@ -491,8 +472,8 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
     /// * `context` - Map of extra experiment data
     pub fn new_with_context(name: &'static str, context: Context) -> Self {
         return Self {
-            experiment: Experiment::new_with_context(name, context)
-        }
+            experiment: Experiment::new_with_context(name, context),
+        };
     }
 
     fn run_if_block_allows(&self) -> bool {
@@ -502,7 +483,7 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
     /// Register a named behavior for this experiment, default "candidate".
     pub fn candidate<F>(&mut self, name: &str, f: F) -> VictorsResult<()>
     where
-        F: Fn() -> R + 'a
+        F: Fn() -> R + 'a,
     {
         self.experiment.candidate(name, f)
     }
@@ -529,18 +510,14 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
     ///                    observation which didn't match the control. If the block returns true the
     ///                    mismatch is disregarded.
     pub fn add_ignore<F>(&mut self, ignore_block: F)
-        where
-            F: Fn(&Observation<R>, &Observation<R>) -> bool + 'a
+    where
+        F: Fn(&Observation<R>, &Observation<R>) -> bool + 'a,
     {
         self.experiment.add_ignore(ignore_block)
     }
 
     /// See [Experiment::ignore_mismatch_observation]
-    pub fn ignore_mismatch_observation(
-        &self,
-        control: &Observation<R>,
-        candidate: &Observation<R>
-    ) -> bool {
+    pub fn ignore_mismatch_observation(&self, control: &Observation<R>, candidate: &Observation<R>) -> bool {
         self.experiment.ignore_mismatch_observation(control, candidate)
     }
 
@@ -555,7 +532,6 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
     // fn publish(&self, result: &ExperimentResult<R>) {
     //     self.experiment.publish(result)
     // }
-
 
     /// Run all the behaviors for this experiment, observing each and publishing the results.
     /// Return the result of the named candidate

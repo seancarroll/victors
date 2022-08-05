@@ -1,6 +1,4 @@
-use crate::context::Context;
-use crate::experiment::Experiment;
-use crate::observation::Observation;
+use crate::{context::Context, experiment::Experiment, observation::Observation};
 
 // TODO: given this should be immutable remove pub from fields
 /// The immutable result of running an experiment.
@@ -20,9 +18,8 @@ pub struct ExperimentResult<R: Clone + PartialEq> {
     pub control_index: usize,
     // pub ignored: Vec<&'a Observation<R>>,
     // pub mismatched: Vec<&'a Observation<R>>,
-
     mismatched_indexes: Vec<usize>,
-    ignored_indexes: Vec<usize>
+    ignored_indexes: Vec<usize>,
 }
 
 impl<'a, R: Clone + PartialEq> ExperimentResult<R> {
@@ -50,13 +47,9 @@ impl<'a, R: Clone + PartialEq> ExperimentResult<R> {
     /// * `experiment`
     /// * `observations`
     /// * `control_index`
-    pub fn new(
-        experiment: &'a Experiment<'_, R>,
-        observations: Vec<Observation<R>>,
-        control_index: usize
-    ) -> Self {
-        let (mismatched_indexes, ignored_indexes)
-            = ExperimentResult::evaluate_candidates(experiment, &observations, control_index);
+    pub fn new(experiment: &'a Experiment<'_, R>, observations: Vec<Observation<R>>, control_index: usize) -> Self {
+        let (mismatched_indexes, ignored_indexes) =
+            ExperimentResult::evaluate_candidates(experiment, &observations, control_index);
         println!("experiment context is [{:?}]", &experiment.context);
         Self {
             experiment_name: experiment.name.to_string(),
