@@ -28,41 +28,48 @@ mod tests {
         cell::{RefCell},
     };
     use std::cell::Ref;
+    use std::collections::HashSet;
 
     use serde_json::{json, Value};
 
-    use crate::{
-        context::Context,
-        errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult},
-        experiment::Experiment,
-        experiment_result::ExperimentResult,
-        observation::Observation,
-        result_publisher::InMemoryPublisher,
-        victor::Victor,
-    };
+    use crate::{context::Context, errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult}, experiment::Experiment, experiment_result::ExperimentResult, observation::Observation, result_publisher::InMemoryPublisher, UncontrolledExperiment, victor::Victor};
 
     #[test]
-    fn it_works() {
+    fn should_be_able_to_run_experiment_with_only_control() {
         let mut experiment = Experiment::default();
-        experiment.control(|| println!("control...")).unwrap();
-        experiment.candidate(|| println!("candidate...")).unwrap();
+        experiment.control(|| "control").unwrap();
 
-        experiment.run().unwrap();
+        let result = experiment.run().unwrap();
+
+        assert_eq!("control", result);
+    }
+
+    #[test]
+    fn should_always_return_control_result() {
+        let mut experiment = Experiment::default();
+        experiment.control(|| "control").unwrap();
+        experiment.candidate(|| "candidate").unwrap();
+
+        let result = experiment.run().unwrap();
+
+        assert_eq!("control", result);
     }
 
     #[test]
     fn should_be_able_to_specify_control_name() {
         let mut experiment = Experiment::new("custom control");
-        experiment.control(|| println!("control...")).unwrap();
+        experiment.control(|| "value").unwrap();
 
         assert_eq!("custom control", experiment.name);
     }
 
     #[test]
-    fn should_return_error_when_controlled_experiment_has_no_control_behavior_defined() {
+    fn should_return_error_when_controlled_experiment_has_no_control_defined() {
         let mut experiment = Experiment::default();
         experiment.candidate(|| 1).unwrap();
+
         let result = experiment.run();
+
         let expected = VictorsErrors::BehaviorMissing(BehaviorMissing {
             experiment_name: "experiment".to_string(),
             name: "control".to_string(),
@@ -71,9 +78,22 @@ mod tests {
     }
 
     #[test]
+    fn should_return_error_when_uncontrolled_experiment_primary_behavior_is_missing() {
+        let mut experiment = UncontrolledExperiment::default();
+        experiment.candidate("candidate", || { "value" }).unwrap();
+
+        let result = experiment.run("candidont");
+
+        let expected = VictorsErrors::BehaviorMissing(BehaviorMissing {
+            experiment_name: "experiment".to_string(),
+            name: "candidont".to_string(),
+        });
+        assert_eq!(expected, result.unwrap_err());
+    }
+
+    #[test]
     fn should_not_run_experiment_when_disabled() {
         let called = RefCell::new(false);
-        let percent = 100;
 
         let mut experiment = Experiment::default();
         experiment.control(|| 1).unwrap();
@@ -131,6 +151,23 @@ mod tests {
         );
     }
 
+    #[test]
+    fn should_shuffle_behaviors_execution_order() {
+        let last = RefCell::new("");
+        let mut runs = HashSet::new();
+
+        let mut experiment = Experiment::default();
+        experiment.control(|| { last.replace("control"); }).unwrap();
+        experiment.candidate(|| { last.replace("candidate"); }).unwrap();
+        for i in 0..1000 {
+            experiment.run().unwrap();
+            runs.insert(last.take());
+        }
+
+        assert!(runs.len() > 1);
+    }
+
+
     // TODO: publish
     // TODO: clean values
 
@@ -171,7 +208,6 @@ mod tests {
     }
 
     // TODO: parallel
-    // TODO: before_run setup
 
     #[test]
     fn should_be_able_to_create_and_run_experiment_via_victor() {
@@ -199,19 +235,6 @@ mod tests {
         });
 
         assert_eq!(Some(2), r.ok());
-    }
-
-    #[test]
-    fn should_return_non_unique_error_when_multiple_candidates_are_registered_with_same_name() {
-        let mut experiment = Experiment::default();
-        experiment.control(|| println!("control...")).unwrap();
-        experiment.candidate(|| println!("candidate...")).unwrap();
-        let result = experiment.candidate(|| println!("second candidate..."));
-        let expected = VictorsErrors::BehaviorNotUnique(BehaviorNotUnique {
-            experiment_name: "experiment".to_string(),
-            name: "candidate".to_string(),
-        });
-        assert_eq!(expected, result.unwrap_err());
     }
 
     // ignore ignore_mismatched_observation tests
@@ -247,9 +270,33 @@ mod tests {
         assert!(!called_three.take());
     }
 
-    // TODO: can't be run without a control behavior  --> this is at least one behavior
-    // TODO: runs other behaviors but always returns the control
-    // TODO: complains about duplicate behavior names
+    #[test]
+    fn should_return_non_unique_error_with_multiple_controls() {
+        let mut experiment = Experiment::default();
+        experiment.control(|| "control").unwrap();
+        let result = experiment.control(|| "control again");
+
+        let expected = VictorsErrors::BehaviorNotUnique(BehaviorNotUnique {
+            experiment_name: "experiment".to_string(),
+            name: "control".to_string(),
+        });
+        assert_eq!(expected, result.unwrap_err());
+    }
+
+    #[test]
+    fn should_return_non_unique_error_when_multiple_candidates_are_registered_with_same_name() {
+        let mut experiment = Experiment::default();
+        experiment.control(|| "value").unwrap();
+        experiment.candidate(|| "candidate").unwrap();
+        let result = experiment.candidate(|| "candidate");
+
+        let expected = VictorsErrors::BehaviorNotUnique(BehaviorNotUnique {
+            experiment_name: "experiment".to_string(),
+            name: "candidate".to_string(),
+        });
+        assert_eq!(expected, result.unwrap_err());
+    }
+
     // TODO: swallows exceptions raised by candidate behaviors
     // TODO: shuffles behaviors before running
     // TODO: re-raises exceptions raised during publish by default
@@ -320,7 +367,7 @@ mod tests {
     // TODO: includes the experiments' results
     // TODO: formats nicely as a string
     // TODO: includes the backtrace when an observation raises
-    
+
     #[test]
     fn should_execute_before_run_when_experiment_is_enabled() {
         let (control_ok, candidate_ok) = (RefCell::new(false), RefCell::new(false));
