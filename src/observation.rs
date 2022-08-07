@@ -1,3 +1,4 @@
+use std::time::Instant;
 use crate::errors::VictorsErrors;
 
 // Observation really only needs experiment to get cleaned value.
@@ -25,7 +26,13 @@ pub struct Observation<R: Clone + PartialEq> {
 
 impl<R: Clone + PartialEq> Observation<R> {
     // TODO: pass in lambda/function block which is executed and duration/value returned
-    pub fn new(name: String, experiment_name: String, value: R, cleaned_value: Option<R>, duration: u128) -> Self {
+    pub fn new(
+        name: String,
+        experiment_name: String,
+        value: R,
+        cleaned_value: Option<R>,
+        duration: u128
+    ) -> Self {
         return Self {
             name,
             value,
@@ -34,6 +41,30 @@ impl<R: Clone + PartialEq> Observation<R> {
             experiment_name,
             duration,
         };
+    }
+
+    // TODO: should we have a Behavior struct with an execute method that returns an Observation?
+    // or just have a method in experiment to execute behavior
+    // TODO: how to handle clean value
+    pub fn initialize<F>(
+        name: String,
+        experiment_name: String,
+        f: F
+    ) -> Self
+    where
+        F: Fn() -> R
+    {
+        let start = Instant::now();
+        let value = f();
+        let duration = start.elapsed();
+
+        Self {
+            name,
+            experiment_name,
+            value,
+            duration: duration.as_millis(),
+            cleaned_value: None
+        }
     }
 
     pub fn clean_value() {

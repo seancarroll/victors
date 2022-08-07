@@ -32,7 +32,15 @@ mod tests {
 
     use serde_json::{json, Value};
 
-    use crate::{context::Context, errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult}, experiment::Experiment, experiment_result::ExperimentResult, observation::Observation, result_publisher::InMemoryPublisher, UncontrolledExperiment, victor::Victor};
+    use crate::{
+        context::Context,
+        errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult},
+        experiment::Experiment,
+        experiment_result::ExperimentResult,
+        observation::Observation,
+        result_publisher::InMemoryPublisher,
+        UncontrolledExperiment, victor::Victor
+    };
 
     #[test]
     fn should_be_able_to_run_experiment_with_only_control() {
@@ -117,18 +125,9 @@ mod tests {
             "experiment",
             Context::from_value(json!({"message": "hello world"})).unwrap(),
         );
-        experiment.control(|| 1).unwrap();
-        experiment.candidate(|| 1).unwrap();
-        experiment.result_publisher(InMemoryPublisher::new(|result| {
-            r.replace(Some(result.clone()));
-        }));
+        experiment.control(|| { 1 }).unwrap();
 
-        experiment.run().unwrap();
-
-        assert_eq!(
-            r.take().unwrap().context.get(&"message".to_string()),
-            Some(&Value::String("hello world".to_string()))
-        );
+        assert_eq!(Context::from_value(json!({"message": "hello world"})).unwrap(), experiment.context);
     }
 
     #[test]
@@ -146,8 +145,8 @@ mod tests {
         experiment.run().unwrap();
 
         assert_eq!(
-            r.take().unwrap().context.get(&"message".to_string()),
-            Some(&Value::String("hello world".to_string()))
+            Context::from_value(json!({"message": "hello world"})).unwrap(),
+            experiment.context
         );
     }
 
@@ -298,11 +297,31 @@ mod tests {
     }
 
     // TODO: swallows exceptions raised by candidate behaviors
-    // TODO: shuffles behaviors before running
+
     // TODO: re-raises exceptions raised during publish by default
     // TODO: reports publishing errors
     // TODO: publishes results
-    // TODO: does not publish results when there is only a control value
+
+
+    #[test]
+    fn should_not_publish_results_when_there_is_only_a_control_value() {
+        let r: RefCell<Option<ExperimentResult<u8>>> = RefCell::new(None);
+
+        let mut experiment = Experiment::new_with_context(
+            "experiment",
+            Context::from_value(json!({"message": "hello world"})).unwrap(),
+        );
+        experiment.control(|| 1).unwrap();
+        experiment.result_publisher(InMemoryPublisher::new(|result| {
+            r.replace(Some(result.clone()));
+        }));
+
+        experiment.run().unwrap();
+
+        assert!(r.take().is_none());
+    }
+
+
     // TODO: compares results with a comparator block if provided
     // TODO: compares errors with an error comparator block if provided
     #[test]
