@@ -119,8 +119,11 @@ impl<'a, R: Clone + PartialEq> ExperimentResult<R> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Experiment, ExperimentResult, Observation};
+    use std::cell::RefCell;
+    use serde_json::json;
+    use crate::{Context, Experiment, ExperimentResult, Observation};
 
+    // TODO: split this test?
     #[test]
     fn should_evaluate_observations() {
         let mut experiment = Experiment::default();
@@ -130,50 +133,154 @@ mod tests {
         let result = ExperimentResult::new(
             &experiment,
             vec![a, b],
-            1
+            0
         );
 
         assert!(result.matched());
         assert!(!result.has_mismatches());
         assert!(result.mismatched().is_empty());
+
+        let x = create_observation("x", 1);
+        let y = create_observation("y", 2);
+        let z = create_observation("z", 3);
+
+        let result = ExperimentResult::new(
+            &experiment,
+            vec![x.clone(), y.clone(), z.clone()],
+            0
+        );
+
+        assert!(!result.matched());
+        assert!(result.has_mismatches());
+        assert_eq!(vec![&y, &z], result.mismatched());
     }
 
     #[test]
     fn should_have_no_mismatches_if_there_is_only_a_control_observation() {
+        let mut experiment = Experiment::default();
+        let a = create_observation("a", 1);
 
+        let result = ExperimentResult::new(
+            &experiment,
+            vec![a],
+            0
+        );
+
+        assert!(result.matched());
     }
 
     #[test]
     fn should_evaluate_observations_using_experiments_compare_block() {
+        let mut experiment = Experiment::default();
+        experiment.comparator(|x: &&str, y: &&str| { x.eq_ignore_ascii_case(y) });
+        let a = create_observation("a", "x");
+        let b = create_observation("b", "X");
 
+
+        let result = ExperimentResult::new(
+            &experiment,
+            vec![a, b],
+            0
+        );
+
+        assert!(result.matched(), "{:?}", result.mismatched());
     }
 
     #[test]
     fn should_not_ignore_any_mismatches_when_nothings_ignored() {
+        let mut experiment = Experiment::default();
+        let a = create_observation("a", 1);
+        let b = create_observation("b", 2);
 
+        let result = ExperimentResult::new(
+            &experiment,
+            vec![a, b],
+            0
+        );
+
+        assert!(result.has_mismatches());
+        assert!(!result.has_ignores());
     }
 
     #[test]
     fn should_use_experiments_ignore_block_to_ignore_mismatched_observations() {
+        let called = RefCell::new(false);
 
+        let mut experiment = Experiment::default();
+        experiment.add_ignore(|_a, _b| { called.replace(true); true });
+
+        let a = create_observation("a", 1);
+        let b = create_observation("b", 2);
+
+        let result = ExperimentResult::new(
+            &experiment,
+            vec![a.clone(), b.clone()],
+            0
+        );
+
+        assert!(!result.has_mismatches());
+        assert!(result.mismatched().is_empty());
+        assert!(!result.matched());
+        assert!(result.has_ignores());
+        assert_eq!(vec![&b], result.ignored());
+        assert!(called.take());
     }
 
     #[test]
     fn should_partition_observations_into_mismatched_and_ignored_when_applicable() {
+        let mut experiment = Experiment::default();
+        experiment.add_ignore(|control, candidate| { candidate.value == 2 });
 
+        let a = create_observation("a", 1);
+        let b = create_observation("b", 2);
+        let c = create_observation("c", 3);
+
+        let result = ExperimentResult::new(
+            &experiment,
+            vec![a.clone(), b.clone(), c.clone()],
+            0
+        );
+
+        assert!(result.has_mismatches());
+        assert_eq!(vec![&c], result.mismatched());
+        assert!(result.has_ignores());
+        assert_eq!(vec![&b], result.ignored());
     }
 
     #[test]
     fn should_expose_experiment_name() {
+        let mut experiment = Experiment::default();
 
+        let a = create_observation("a", 1);
+        let b = create_observation("b", 1);
+
+        let result = ExperimentResult::new(
+            &experiment,
+            vec![a, b],
+            0
+        );
+
+        assert_eq!(experiment.name, result.experiment_name);
     }
 
     #[test]
     fn should_expose_context_from_experiment() {
+        let mut experiment = Experiment::default();
+        experiment.add_context(Context::from_value(json!({"foo": "bar"})).unwrap());
 
+        let a = create_observation("a", 1);
+        let b = create_observation("b", 1);
+
+        let result = ExperimentResult::new(
+            &experiment,
+            vec![a, b],
+            0
+        );
+
+        assert_eq!(Context::from_value(json!({"foo": "bar"})).unwrap(), result.context);
     }
 
-    fn create_observation(name: &'static str, value: u8) -> Observation<u8> {
+    fn create_observation<R: Clone + PartialEq>(name: &'static str, value: R) -> Observation<R> {
         return Observation::new(
             name.to_string(),
             "experiment".to_string(),
