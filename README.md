@@ -6,6 +6,8 @@ Victor's experiments allow for carefully refactoring critical paths.
 
 This library is inspired by the ruby gem [scientist](https://github.com/github/scientist).
 
+> 📝 **NOTE**: This README was primarily taken from the [scientist README](https://github.com/github/scientist).
+
 ## How to run experiments?
 
 TODO: add example
