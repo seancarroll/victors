@@ -1,10 +1,15 @@
+use std::any::Any;
 use crate::{context::Context, experiment::Experiment, observation::Observation};
+use serde::{Deserialize, Serialize};
+
+trait ExperimentValue: Clone {}
 
 /// The immutable result of running an experiment.
-#[derive(Clone, PartialEq)]
-pub struct ExperimentResult<R: Clone + PartialEq> {
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct ExperimentResult<R: Clone + PartialEq + Serialize> {
     experiment_name: String,
     observations: Vec<Observation<R>>,
+    // observations: Vec<Observation<dyn ExperimentValue + PartialEq>>,
     context: Context,
     // TODO: I dont love using "control" here as its abusing the name for uncontrolled experiments
     // need to find a better term. Maybe primary behavior
@@ -13,7 +18,8 @@ pub struct ExperimentResult<R: Clone + PartialEq> {
     ignored_indexes: Vec<usize>,
 }
 
-impl<'a, R: Clone + PartialEq> ExperimentResult<R> {
+impl<'a, R: Clone + PartialEq + Serialize> ExperimentResult<R> {
+// impl<'a> ExperimentResult {
 
     /// Create a new experiment result
     ///
@@ -22,6 +28,7 @@ impl<'a, R: Clone + PartialEq> ExperimentResult<R> {
     /// * `observations`
     /// * `control_index`
     pub fn new(
+    // pub fn new<R: ExperimentValue + PartialEq>(
         experiment: &'a Experiment<'_, R>,
         observations: Vec<Observation<R>>,
         control_index: usize
@@ -120,6 +127,7 @@ impl<'a, R: Clone + PartialEq> ExperimentResult<R> {
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
+    use serde::Serialize;
     use serde_json::json;
     use crate::{Context, Experiment, ExperimentResult, Observation};
 
@@ -280,7 +288,10 @@ mod tests {
         assert_eq!(Context::from_value(json!({"foo": "bar"})).unwrap(), result.context);
     }
 
-    fn create_observation<R: Clone + PartialEq>(name: &'static str, value: R) -> Observation<R> {
+    fn create_observation<R: Clone + PartialEq + Serialize>(
+        name: &'static str,
+        value: R
+    ) -> Observation<R> {
         return Observation::new(
             name.to_string(),
             "experiment".to_string(),

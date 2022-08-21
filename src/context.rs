@@ -1,7 +1,6 @@
 // This was based on Tera's Context. See https://github.com/Keats/tera
 use std::collections::HashMap;
-
-use serde::ser::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{to_value, Map, Value};
 
 use crate::errors::{VictorsErrors, VictorsResult};
@@ -9,7 +8,7 @@ use crate::errors::{VictorsErrors, VictorsResult};
 /// The struct that holds the context of an experiment.
 ///
 /// Light wrapper around a `HashMap` for easier insertions of Serializable values
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Context {
     data: HashMap<String, Value>,
 }

@@ -1,5 +1,6 @@
 use std::time::Instant;
 use crate::errors::VictorsErrors;
+use serde::{Deserialize, Serialize};
 
 // Observation really only needs experiment to get cleaned value.
 // instead of passing in experiment and calling into it to get clean_value
@@ -11,8 +12,8 @@ use crate::errors::VictorsErrors;
 
 // TODO: should R also include Copy?
 /// What happened when this named behavior was executed? Immutable.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Observation<R: Clone + PartialEq> {
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Observation<R: Clone + PartialEq + Serialize> {
     /// The experiment this observation is for
     pub experiment_name: String,
     /// name of the behavior
@@ -24,7 +25,7 @@ pub struct Observation<R: Clone + PartialEq> {
     pub duration: u128,
 }
 
-impl<R: Clone + PartialEq> Observation<R> {
+impl<R: Clone + PartialEq + Serialize> Observation<R> {
     // TODO: pass in lambda/function block which is executed and duration/value returned
     pub fn new(
         name: String,

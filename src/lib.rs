@@ -29,18 +29,42 @@ mod tests {
     };
     use std::cell::Ref;
     use std::collections::HashSet;
+    use serde::Serialize;
 
     use serde_json::{json, Value};
 
-    use crate::{
-        context::Context,
-        errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult},
-        experiment::Experiment,
-        experiment_result::ExperimentResult,
-        observation::Observation,
-        result_publisher::InMemoryPublisher,
-        UncontrolledExperiment, victor::Victor
-    };
+    use crate::{context::Context, errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult}, experiment::Experiment, experiment_result::ExperimentResult, observation::Observation, Publisher, result_publisher::InMemoryPublisher, UncontrolledExperiment, victor::Victor};
+    use crate::victor::Scientist;
+
+    #[test]
+    fn try_new_dr() {
+
+        pub struct PrintPublisher;
+        impl<R: Clone + PartialEq + Serialize> Publisher<R> for PrintPublisher {
+            fn publish(&self, result: &ExperimentResult<R>) {
+                println!("{}", serde_json::to_string(result).unwrap());
+            }
+        }
+
+        struct Reed;
+        impl<'a, R: Clone + PartialEq + Serialize> Scientist<'a, R> for Reed {
+            type P = PrintPublisher;
+
+            fn get_publisher() -> Self::P {
+                return PrintPublisher{};
+            }
+        }
+
+        let r = Reed::conduct("conduct test", |experiment| {
+            experiment.control(|| 1)?;
+            experiment.candidate(|| 2)?;
+            Ok(())
+        });
+
+        assert_eq!(Some(1), r.ok());
+
+    }
+
 
     #[test]
     fn should_be_able_to_run_experiment_with_only_control() {
@@ -321,12 +345,11 @@ mod tests {
         assert!(r.take().is_none());
     }
 
-
     // TODO: compares results with a comparator block if provided
     // TODO: compares errors with an error comparator block if provided
     #[test]
     fn should_compare_results_with_comparator_when_provided() {
-        #[derive(Clone, PartialEq)]
+        #[derive(Clone, PartialEq, Serialize)]
         struct TestResult {
             count: u8,
             message: &'static str,

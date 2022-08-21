@@ -1,6 +1,7 @@
 use std::{collections::HashMap, time::Instant};
 
 use rand::{seq::SliceRandom, thread_rng};
+use serde::Serialize;
 
 use crate::{
     context::Context,
@@ -99,7 +100,7 @@ type ErrorComparator = fn(a: &String, b: &String) -> bool;
 // type PublisherBlock<R> = Box<dyn Publisher<ExperimentResult<R>>>;
 // type PublisherBlock<R> = fn(result: &ExperimentResult<R>);
 
-pub struct Experiment<'a, R: Clone + PartialEq> {
+pub struct Experiment<'a, R: Clone + PartialEq + Serialize> {
     pub name: String,
 
     // TODO: probably need to have behaviors return results
@@ -130,7 +131,7 @@ pub struct Experiment<'a, R: Clone + PartialEq> {
 //     }
 // }
 
-impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
+impl<'a, R: Clone + PartialEq + Serialize> Experiment<'a, R> {
     /// Creates a new experiment with the name "experiment"
     pub fn default() -> Self {
         return Experiment::new(DEFAULT_EXPERIMENT_NAME);
@@ -442,11 +443,11 @@ impl<'a, R: Clone + PartialEq> Experiment<'a, R> {
     }
 }
 
-pub struct UncontrolledExperiment<'a, R: Clone + PartialEq> {
+pub struct UncontrolledExperiment<'a, R: Clone + PartialEq + Serialize> {
     experiment: Experiment<'a, R>,
 }
 
-impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
+impl<'a, R: Clone + PartialEq + Serialize> UncontrolledExperiment<'a, R> {
     /// Creates a new experiment with the name "experiment"
     pub fn default() -> Self {
         return Self {
@@ -534,6 +535,10 @@ impl<'a, R: Clone + PartialEq> UncontrolledExperiment<'a, R> {
     // fn publish(&self, result: &ExperimentResult<R>) {
     //     self.experiment.publish(result)
     // }
+
+    pub fn result_publisher<T: Publisher<R> + 'a>(&mut self, publisher: T) {
+        self.experiment.publisher = Box::new(publisher);
+    }
 
     /// Run all the behaviors for this experiment, observing each and publishing the results.
     /// Return the result of the named candidate
