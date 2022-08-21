@@ -54,20 +54,7 @@ pub trait Scientist<'a, R: Clone + PartialEq + Serialize> {
 
 }
 
-// pub struct P;
-// impl<'a, R: Clone + PartialEq> Scientist<'a, R> for P {
-//     type PUB = NoopPublisher;
-//
-//     fn get_publisher(&self) -> NoopPublisher {
-//         return NoopPublisher{};
-//     }
-// }
-
 pub struct Victor;
-// pub struct Victor<'a, R: Clone + PartialEq> {
-//     // TODO: do we need to make `dyn publisher` implement clone trait?
-//     publisher: Option<Box<dyn Publisher<R> + 'a>>, // TODO: make this an Option
-// }
 
 impl<'a, R: Clone + PartialEq + Serialize> Scientist<'a, R> for Victor {
     type P = NoopPublisher;
@@ -76,86 +63,6 @@ impl<'a, R: Clone + PartialEq + Serialize> Scientist<'a, R> for Victor {
         return NoopPublisher{};
     }
 }
-
-
-// /// Helper that will instantiate and experiment and call run for you
-// impl Victor {
-//
-//     // pub fn conduct_controlled<F>(&self, name: &'static str, experiment_block: F) -> VictorsResult<R>
-//     //     where
-//     //         F: Fn(&mut Experiment<'_, R>) -> VictorsResult<()>,
-//     // {
-//     //     let mut experiment = Experiment::new(name);
-//     //     if let Some(publisher) = &self.publisher {
-//     //         experiment.result_publisher(Box::new((**publisher).clone()));
-//     //     }
-//     //     experiment_block(&mut experiment)?;
-//     //     return experiment.run();
-//     // }
-//     //
-//     // pub fn conduct_unc<F>(
-//     //     &self,
-//     //     name: &'static str,
-//     //     return_candidate_result: &'static str,
-//     //     experiment_block: F
-//     // ) -> VictorsResult<R>
-//     //     where
-//     //         F: Fn(&mut UncontrolledExperiment<'_, R>) -> VictorsResult<()>,
-//     // {
-//     //     let mut experiment = UncontrolledExperiment::new(name);
-//     //     if let Some(publisher) = &self.publisher {
-//     //         experiment.result_publisher(Box::new((**publisher).clone()));
-//     //     }
-//     //     experiment_block(&mut experiment)?;
-//     //     return experiment.run(return_candidate_result);
-//     // }
-//
-//
-//     /// Define and run a controlled experiment.
-//     ///
-//     /// # Arguments
-//     /// * `name` - the name of the experiment
-//     /// * `experiment_block` - Function to configure the experiment
-//     ///
-//     /// # Return
-//     /// Returns the calculated value of the control experiment or error
-//     // pub fn conduct<F>(name: &'static str, experiment_block: F) -> VictorsResult<R>
-//     pub fn conduct<F, R: Clone + PartialEq>(name: &'static str, experiment_block: F) -> VictorsResult<R>
-//     where
-//         F: Fn(&mut Experiment<'_, R>) -> VictorsResult<()>,
-//     {
-//         let mut experiment = Experiment::new(name);
-//         experiment_block(&mut experiment)?;
-//         return experiment.run();
-//     }
-//
-//     /// Define and run an uncontrolled experiment.
-//     /// Uncontrolled experiments contain only candidates and do not have a control.
-//     ///
-//     /// # Arguments
-//     /// * `name` - the name of the experiment
-//     /// * `return_candidate_result` - name of the candidate's result to return
-//     /// * `experiment_block` - Function to configure the experiment
-//     ///
-//     /// # Return
-//     /// Returns the calculated value of the named experiment or error
-//     // pub fn conduct_uncontrolled<F>(
-//     pub fn conduct_uncontrolled<F, R: Clone + PartialEq>(
-//         name: &'static str,
-//         return_candidate_result: &'static str,
-//         experiment_block: F,
-//     ) -> VictorsResult<R>
-//     where
-//         F: Fn(&mut UncontrolledExperiment<'_, R>) -> VictorsResult<()>,
-//     {
-//         let mut experiment = UncontrolledExperiment::new(name);
-//         experiment_block(&mut experiment)?;
-//         return experiment.run(return_candidate_result);
-//     }
-// }
-
-// TODO: need better name
-// trait ExperimentValue: Any + Clone{}
 
 // /// Represents the globally configured [`Publisher`] instance for this application.
 // #[derive(Clone)]

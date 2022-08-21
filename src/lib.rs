@@ -24,6 +24,7 @@ pub use crate::{
 
 #[cfg(test)]
 mod tests {
+    use bincode;
     use std::{
         cell::{RefCell},
     };
@@ -33,7 +34,19 @@ mod tests {
 
     use serde_json::{json, Value};
 
-    use crate::{context::Context, errors::{BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult}, experiment::Experiment, experiment_result::ExperimentResult, observation::Observation, Publisher, result_publisher::InMemoryPublisher, UncontrolledExperiment, victor::Victor};
+    use crate::{
+        context::Context,
+        errors::{
+            BehaviorMissing, BehaviorNotUnique, VictorsErrors, VictorsResult
+        },
+        experiment::Experiment,
+        experiment_result::ExperimentResult,
+        observation::Observation,
+        Publisher,
+        result_publisher::InMemoryPublisher,
+        UncontrolledExperiment,
+        victor::Victor
+    };
     use crate::victor::Scientist;
 
     #[test]
@@ -398,7 +411,7 @@ mod tests {
     // TODO: "raises a mismatch error if the control raises and candidate doesn't"
     // TODO: "raises a mismatch error if the candidate raises and the control doesn't"
 
-    // TODO: can be marshaled
+
 
     // TODO: raise_on_mismatches
     // TODO: raises when there is a mismatch if the experiment instance's raise on mismatches is enabled
@@ -440,6 +453,34 @@ mod tests {
         let value = experiment.run().unwrap();
 
         assert!(!before_run_called.take());
+    }
+
+    #[test]
+    fn should_be_able_to_serialize_experiment_result() {
+        let r: RefCell<Option<ExperimentResult<String>>> = RefCell::new(None);
+
+        let mut experiment = Experiment::default();
+        experiment.add_ignore(|_a, b| {
+            b.value == "ignored"
+        });
+        experiment.control(|| "control".to_string()).unwrap();
+        experiment.candidate(|| "candidate".to_string()).unwrap();
+        experiment.candidate_with_name("second", || "ignored".to_string()).unwrap();
+        experiment.result_publisher(InMemoryPublisher::new(|result| {
+            r.replace(Some(result.clone()));
+        }));
+
+        experiment.run().unwrap();
+
+        let experiment_result = r.take().unwrap();
+        assert!(experiment_result.has_mismatches());
+        assert!(experiment_result.has_ignores());
+
+        let binary = bincode::serialize(&experiment_result);
+        assert!(binary.is_ok());
+
+        let json = serde_json::to_string(&experiment_result);
+        assert!(json.is_ok())
     }
 
     fn create_observation(name: &'static str) -> Observation<u8> {

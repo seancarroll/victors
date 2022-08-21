@@ -134,7 +134,7 @@ mod tests {
     // TODO: split this test?
     #[test]
     fn should_evaluate_observations() {
-        let mut experiment = Experiment::default();
+        let experiment = Experiment::default();
         let a = create_observation("a", 1);
         let b = create_observation("b", 1);
 
@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn should_have_no_mismatches_if_there_is_only_a_control_observation() {
-        let mut experiment = Experiment::default();
+        let experiment = Experiment::default();
         let a = create_observation("a", 1);
 
         let result = ExperimentResult::new(
@@ -196,7 +196,7 @@ mod tests {
 
     #[test]
     fn should_not_ignore_any_mismatches_when_nothings_ignored() {
-        let mut experiment = Experiment::default();
+        let experiment = Experiment::default();
         let a = create_observation("a", 1);
         let b = create_observation("b", 2);
 
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn should_expose_experiment_name() {
-        let mut experiment = Experiment::default();
+        let experiment = Experiment::default();
 
         let a = create_observation("a", 1);
         let b = create_observation("b", 1);
