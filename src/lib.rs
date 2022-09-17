@@ -390,6 +390,7 @@ mod tests {
         assert!(r.take().unwrap().matched());
     }
 
+
     // TODO: knows how to compare two experiments
     // TODO: uses a compare block to determine if observations are equivalent
     // TODO: reports errors in a compare block

@@ -23,6 +23,7 @@ pub struct Observation<R: Clone + PartialEq + Serialize> {
     pub cleaned_value: Option<R>, // TODO: what type should this be?
     // pub exception: Option<VictorsErrors>,
     pub duration: u128,
+    // exception - should this be a Victor error or would it just be Err? How to attach backtrace?
 }
 
 impl<R: Clone + PartialEq + Serialize> Observation<R> {

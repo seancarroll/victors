@@ -52,6 +52,7 @@ pub trait Scientist<'a, R: Clone + PartialEq + Serialize> {
 
     fn get_publisher() -> Self::P;
 
+    // TODO: should have err_on_mismatch fn?
 }
 
 pub struct Victor;
@@ -86,6 +87,52 @@ impl<'a, R: Clone + PartialEq + Serialize> Scientist<'a, R> for Victor {
 //         NoopPublisher{},
 //     ))
 // });
+
+pub trait ObjectSafePublisher {
+}
+
+impl<T> ObjectSafePublisher for T
+where
+    T: Clone + PartialEq + Serialize
+{
+
+}
+
+pub struct BoxedResultPublisher(Box<dyn Publisher<_> + Clone + PartialEq + Serialize>);
+impl BoxedResultPublisher {
+    pub(crate) fn new<T>(publisher: T) -> Self
+        where
+            T: Clone + PartialEq + Serialize + 'static,
+    {
+        BoxedResultPublisher(Box::new(publisher))
+    }
+}
+
+
+/// Represents the globally configured [`Publisher`] instance for this application.
+#[derive(Clone)]
+pub struct GlobalResultPublisherProvider {
+    publisher: Arc<BoxedResultPublisher>,
+}
+
+impl GlobalResultPublisherProvider {
+    /// Create a new GlobalResultPublisher instance from a struct that implements `Publisher`.
+    fn new<R, P>(publisher: P) -> Self
+        where
+            R: Clone + PartialEq + Serialize,
+            P: Publisher<R> + 'static,
+    {
+        GlobalResultPublisher {
+            publisher: Arc::new(publisher),
+        }
+    }
+}
+
+static GLOBAL_RESULT_PUBLISHER: once_cell::sync::Lazy<RwLock<GlobalResultPublisher>> = once_cell::sync::Lazy::new(|| {
+    RwLock::new(GlobalResultPublisher::new(
+        NoopPublisher{},
+    ))
+});
 
 
 

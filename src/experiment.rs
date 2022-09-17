@@ -393,7 +393,7 @@ impl<'a, R: Clone + PartialEq + Serialize> Experiment<'a, R> {
         // customize behavior. Default behavior is to re-raise the exception
         self.publisher.publish(&result);
 
-        if self.err_on_mismatches && result.matched() {
+        if self.err_on_mismatches && result.has_mismatches() {
             // TODO: do we want to support custom mismatch error?
             // ruby version has a `raise_with` fn that sets `@_scientist_custom_mismatch_error`
             // to allow for a custom err to be raised
