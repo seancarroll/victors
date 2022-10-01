@@ -1,4 +1,5 @@
 use std::{collections::HashMap, time::Instant};
+use std::borrow::Borrow;
 
 use rand::{seq::SliceRandom, thread_rng};
 use serde::Serialize;
@@ -10,6 +11,7 @@ use crate::{
     observation::Observation,
     result_publisher::{NoopPublisher, Publisher},
 };
+use crate::result_publisher::Value;
 
 const CONTROL_NAME: &str = "control";
 const DEFAULT_CANDIDATE_NAME: &str = "candidate";
@@ -19,7 +21,7 @@ pub trait Experimentation {
     type Result;
 
     // type T: Display = String;
-    type Ignore: FnOnce(&Observation<Self::Result>, &Observation<Self::Result>) -> bool;
+    type Ignore: FnOnce(&Observation, &Observation) -> bool;
 
     type EnabledFn: Fn() -> bool;
 
@@ -51,7 +53,7 @@ pub trait Experimentation {
 
     fn add_ignore<F>(&mut self, block: F)
     where
-        F: Fn(&Observation<Self::Result>, &Observation<Self::Result>) -> bool;
+        F: Fn(&Observation, &Observation) -> bool;
 
     fn cleaner<F>(&mut self, block: F)
     where
@@ -94,8 +96,8 @@ type BeforeRunBlock = fn();
 type CleanerBlock<R> = fn(R);
 type EnabledFn = fn() -> bool;
 // type IgnoresBlock<R> = Box<dyn FnOnce(&Observation<R>, &Observation<R>) -> bool>;
-type IgnoresBlock<R> = fn(&Observation<R>, &Observation<R>) -> bool;
-type ValueComparator<R> = fn(a: &R, b: &R) -> bool;
+type IgnoresBlock = fn(&Observation, &Observation) -> bool;
+type ValueComparator = fn(a: &Value, b: &Value) -> bool;
 type ErrorComparator = fn(a: &String, b: &String) -> bool;
 // type PublisherBlock<R> = Box<dyn Publisher<ExperimentResult<R>>>;
 // type PublisherBlock<R> = fn(result: &ExperimentResult<R>);
@@ -118,11 +120,11 @@ pub struct Experiment<'a, R: Clone + PartialEq + Serialize> {
     enabled: EnabledFn, // TODO: should this be a fn pointer or Fn?
     pub context: Context, /* TODO: maybe AHashMap<String, Box<dyn Any>>, https://github.com/actix/actix-web/blob/7dc034f0fb70846d9bb3445a2414a142356892e1/actix-http/src/extensions.rs */
     // ignores: Vec<IgnoresBlock<R>>, //Vec<fn(&Observation<R>, &Observation<R>) -> bool>, // TODO: might need to return Result<bool>
-    ignores: Vec<Box<dyn Fn(&Observation<R>, &Observation<R>) -> bool + 'a>>,
+    ignores: Vec<Box<dyn Fn(&Observation, &Observation) -> bool + 'a>>,
     pub err_on_mismatches: bool,
-    comparator: Option<ValueComparator<R>>,
+    comparator: Option<ValueComparator>,
     error_comparator: Option<ErrorComparator>,
-    pub publisher: Box<dyn Publisher<R> + 'a>, // TODO: make this an Option
+    pub publisher: Box<dyn Publisher + 'a>, // TODO: make this an Option
 }
 
 // impl<F: FnOnce(&Observation<R>, &Observation<R>) -> bool, R: Clone + PartialEq> Experimentation<F, R> for Experiment<R> {
@@ -250,24 +252,26 @@ impl<'a, R: Clone + PartialEq + Serialize> Experiment<'a, R> {
         self.cleaner = Some(f)
     }
 
-    fn generate_result(&self, name: String) -> VictorsResult<ExperimentResult<R>> {
+    fn generate_result(&self, name: String) -> VictorsResult<(R, ExperimentResult)> {
         let mut observations = vec![];
         let mut observation_to_return_index = None;
+        let mut r: Option<R> = None;
 
         // TODO: better way to get keys and shuffle?
         let mut keys = Vec::from_iter(self.behaviors.keys().cloned());
         keys.shuffle(&mut thread_rng());
         for (i, key) in keys.iter().enumerate() {
             let behavior = self.behaviors.get(key);
-            if let Some(behavior) = behavior {
+            if let Some(b) = behavior {
                 let start = Instant::now();
-                let behavior_results = behavior();
+                let behavior_results:R = b();
+                r = Some(behavior_results.clone());
                 let duration = start.elapsed();
                 // TODO: need to clean value at some point
                 let observation = Observation::new(
                     key.to_string(),
                     self.name.to_string(),
-                    behavior_results,
+                    Value::new(behavior_results.clone()), // TODO: fix clone
                     None,
                     duration.as_millis(),
                 );
@@ -279,12 +283,13 @@ impl<'a, R: Clone + PartialEq + Serialize> Experiment<'a, R> {
             }
         }
 
+        // TODO: fix behavior_results.unwrap()
         match observation_to_return_index {
             None => Err(VictorsErrors::BehaviorMissing(BehaviorMissing {
                 experiment_name: self.name.to_string(),
                 name,
             })),
-            Some(o) => Ok(ExperimentResult::new(&self, observations, o)),
+            Some(o) => Ok((r.unwrap(), ExperimentResult::new(&self, observations, o))),
         }
     }
 
@@ -300,7 +305,7 @@ impl<'a, R: Clone + PartialEq + Serialize> Experiment<'a, R> {
     ///                    mismatch is disregarded.
     pub fn add_ignore<F>(&mut self, ignore_block: F)
     where
-        F: Fn(&Observation<R>, &Observation<R>) -> bool + 'a,
+        F: Fn(&Observation, &Observation) -> bool + 'a,
     {
         self.ignores.push(Box::new(ignore_block))
     }
@@ -316,7 +321,7 @@ impl<'a, R: Clone + PartialEq + Serialize> Experiment<'a, R> {
     ///
     /// # Return
     /// whether or not to ignore mismatch observation
-    pub fn ignore_mismatch_observation(&self, control: &Observation<R>, candidate: &Observation<R>) -> bool {
+    pub fn ignore_mismatch_observation(&self, control: &Observation, candidate: &Observation) -> bool {
         if self.ignores.is_empty() {
             return false;
         }
@@ -325,7 +330,7 @@ impl<'a, R: Clone + PartialEq + Serialize> Experiment<'a, R> {
     }
 
     // TODO: does this need to return a result?
-    pub fn observations_are_equivalent(&self, a: &Observation<R>, b: &Observation<R>) -> bool {
+    pub fn observations_are_equivalent(&self, a: &Observation, b: &Observation) -> bool {
         return a.equivalent_to(b, self.comparator, self.error_comparator);
     }
 
@@ -339,7 +344,7 @@ impl<'a, R: Clone + PartialEq + Serialize> Experiment<'a, R> {
 
     // // Don't publish anything.
     // fn publish(&self, result: &ExperimentResult<R>) {}
-    pub fn result_publisher<T: Publisher<R> + 'a>(&mut self, publisher: T) {
+    pub fn result_publisher<T: Publisher + 'a>(&mut self, publisher: T) {
         self.publisher = Box::new(publisher);
     }
 
@@ -387,7 +392,8 @@ impl<'a, R: Clone + PartialEq + Serialize> Experiment<'a, R> {
             before_block()
         }
 
-        let result = self.generate_result(name.to_string())?;
+        // TODO: figure out better structure
+        let (r, result) = self.generate_result(name.to_string())?;
         // TODO: this should return a VictorsError<()> to handle errors?
         // ruby version has a `raised` fn that takes in operation and error and allows users to
         // customize behavior. Default behavior is to re-raise the exception
@@ -412,7 +418,7 @@ impl<'a, R: Clone + PartialEq + Serialize> Experiment<'a, R> {
         // }
 
         // TODO: fix unwrap
-        return Ok(result.control().unwrap().value.to_owned());
+        return Ok(r);
     }
 
     fn should_experiment_run(&self) -> bool {
@@ -429,7 +435,7 @@ impl<'a, R: Clone + PartialEq + Serialize> Experiment<'a, R> {
     /// # Arguments
     /// * `comparator` - The block must take two arguments, the control value and a candidate value,
     ///                  and return true or false.
-    pub fn comparator(&mut self, comparator: fn(a: &R, b: &R) -> bool) {
+    pub fn comparator(&mut self, comparator: fn(a: &Value, b: &Value) -> bool) {
         self.comparator = Some(comparator);
     }
 
@@ -514,13 +520,13 @@ impl<'a, R: Clone + PartialEq + Serialize> UncontrolledExperiment<'a, R> {
     ///                    mismatch is disregarded.
     pub fn add_ignore<F>(&mut self, ignore_block: F)
     where
-        F: Fn(&Observation<R>, &Observation<R>) -> bool + 'a,
+        F: Fn(&Observation, &Observation) -> bool + 'a,
     {
         self.experiment.add_ignore(ignore_block)
     }
 
     /// See [Experiment::ignore_mismatch_observation]
-    pub fn ignore_mismatch_observation(&self, control: &Observation<R>, candidate: &Observation<R>) -> bool {
+    pub fn ignore_mismatch_observation(&self, control: &Observation, candidate: &Observation) -> bool {
         self.experiment.ignore_mismatch_observation(control, candidate)
     }
 
@@ -536,7 +542,7 @@ impl<'a, R: Clone + PartialEq + Serialize> UncontrolledExperiment<'a, R> {
     //     self.experiment.publish(result)
     // }
 
-    pub fn result_publisher<T: Publisher<R> + 'a>(&mut self, publisher: T) {
+    pub fn result_publisher<T: Publisher + 'a>(&mut self, publisher: T) {
         self.experiment.publisher = Box::new(publisher);
     }
 
@@ -551,7 +557,7 @@ impl<'a, R: Clone + PartialEq + Serialize> UncontrolledExperiment<'a, R> {
         return self.experiment.should_experiment_run();
     }
 
-    pub fn observations_are_equivalent(&self, a: &Observation<R>, b: &Observation<R>) -> bool {
+    pub fn observations_are_equivalent(&self, a: &Observation, b: &Observation) -> bool {
         return self.experiment.observations_are_equivalent(a, b);
     }
 

@@ -1,14 +1,15 @@
 use std::any::Any;
 use crate::{context::Context, experiment::Experiment, observation::Observation};
 use serde::{Deserialize, Serialize};
+use crate::result_publisher::Value;
 
 trait ExperimentValue: Clone {}
 
 /// The immutable result of running an experiment.
 #[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct ExperimentResult<R: Clone + PartialEq + Serialize> {
+pub struct ExperimentResult {
     experiment_name: String,
-    observations: Vec<Observation<R>>,
+    observations: Vec<Observation>,
     // observations: Vec<Observation<dyn ExperimentValue + PartialEq>>,
     context: Context,
     // TODO: I dont love using "control" here as its abusing the name for uncontrolled experiments
@@ -18,7 +19,7 @@ pub struct ExperimentResult<R: Clone + PartialEq + Serialize> {
     ignored_indexes: Vec<usize>,
 }
 
-impl<'a, R: Clone + PartialEq + Serialize> ExperimentResult<R> {
+impl<'a> ExperimentResult {
 // impl<'a> ExperimentResult {
 
     /// Create a new experiment result
@@ -27,10 +28,10 @@ impl<'a, R: Clone + PartialEq + Serialize> ExperimentResult<R> {
     /// * `experiment`
     /// * `observations`
     /// * `control_index`
-    pub fn new(
+    pub fn new<R: Clone + PartialEq + Serialize>(
     // pub fn new<R: ExperimentValue + PartialEq>(
         experiment: &'a Experiment<'_, R>,
-        observations: Vec<Observation<R>>,
+        observations: Vec<Observation>,
         control_index: usize
     ) -> Self {
         let (mismatched_indexes, ignored_indexes) =
@@ -52,7 +53,7 @@ impl<'a, R: Clone + PartialEq + Serialize> ExperimentResult<R> {
 
     // TODO: rename as i dont like "control"
     /// Returns the control observation
-    pub fn control(&self) -> Option<&Observation<R>> {
+    pub fn control(&self) -> Option<&Observation> {
         return self.observations.get(self.control_index);
     }
 
@@ -62,7 +63,7 @@ impl<'a, R: Clone + PartialEq + Serialize> ExperimentResult<R> {
     }
 
     /// Return mismatched observations
-    pub fn mismatched(&self) -> Vec<&Observation<R>> {
+    pub fn mismatched(&self) -> Vec<&Observation> {
         let mut mismatched = vec![];
         for i in &self.mismatched_indexes {
             if let Some(observation) = self.observations.get(*i) {
@@ -73,7 +74,7 @@ impl<'a, R: Clone + PartialEq + Serialize> ExperimentResult<R> {
     }
 
     /// return ignored observations
-    pub fn ignored(&self) -> Vec<&Observation<R>> {
+    pub fn ignored(&self) -> Vec<&Observation> {
         let mut ignores = vec![];
         for i in &self.ignored_indexes {
             if let Some(observation) = self.observations.get(*i) {
@@ -99,9 +100,9 @@ impl<'a, R: Clone + PartialEq + Serialize> ExperimentResult<R> {
 
     // TODO: can evaluate candidate outside and then dont have to worry about lifetime
     /// Evaluate the candidates to find mismatched and ignored results.
-    fn evaluate_candidates(
+    fn evaluate_candidates<R: Clone + PartialEq + Serialize>(
         experiment: &'a Experiment<'_, R>,
-        observations: &'a Vec<Observation<R>>,
+        observations: &'a Vec<Observation>,
         control_index: usize,
     ) -> (Vec<usize>, Vec<usize>) {
         let mut mismatched = vec![];
@@ -130,6 +131,7 @@ mod tests {
     use serde::Serialize;
     use serde_json::json;
     use crate::{Context, Experiment, ExperimentResult, Observation};
+    use crate::result_publisher::Value;
 
     // TODO: split this test?
     #[test]
@@ -288,14 +290,15 @@ mod tests {
         assert_eq!(Context::from_value(json!({"foo": "bar"})).unwrap(), result.context);
     }
 
+    // TODO: converting from R to Value
     fn create_observation<R: Clone + PartialEq + Serialize>(
         name: &'static str,
         value: R
-    ) -> Observation<R> {
+    ) -> Observation {
         return Observation::new(
             name.to_string(),
             "experiment".to_string(),
-            value,
+            Value.new(value),
             None,
             1
         );

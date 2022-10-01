@@ -2,7 +2,7 @@
 #![doc(issue_tracker_base_url = "https://github.com/seancarroll/victors/issues/")]
 #![cfg_attr(docsrs, deny(broken_intra_doc_links))]
 #![feature(backtrace)]
-#![deny(elided_lifetimes_in_paths)]
+// #![deny(elided_lifetimes_in_paths)]
 
 pub mod context;
 pub mod errors;
@@ -54,7 +54,7 @@ mod tests {
 
         pub struct PrintPublisher;
         impl<R: Clone + PartialEq + Serialize> Publisher<R> for PrintPublisher {
-            fn publish(&self, result: &ExperimentResult<R>) {
+            fn publish(&self, result: &ExperimentResult<Value>) {
                 println!("{}", serde_json::to_string(result).unwrap());
             }
         }

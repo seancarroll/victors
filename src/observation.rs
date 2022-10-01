@@ -1,6 +1,7 @@
 use std::time::Instant;
 use crate::errors::VictorsErrors;
 use serde::{Deserialize, Serialize};
+use crate::result_publisher::Value;
 
 // Observation really only needs experiment to get cleaned value.
 // instead of passing in experiment and calling into it to get clean_value
@@ -13,26 +14,26 @@ use serde::{Deserialize, Serialize};
 // TODO: should R also include Copy?
 /// What happened when this named behavior was executed? Immutable.
 #[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct Observation<R: Clone + PartialEq + Serialize> {
+pub struct Observation {
     /// The experiment this observation is for
     pub experiment_name: String,
     /// name of the behavior
     pub name: String,
-    pub value: R, // TODO: Does this need to be Option<R>
+    pub value: Value, // TODO: Does this need to be Option<R>
     /// cleaned value suitable for publishing. See [Experiment::cleaner] block. None if no cleaner
-    pub cleaned_value: Option<R>, // TODO: what type should this be?
+    pub cleaned_value: Option<Value>, // TODO: what type should this be?
     // pub exception: Option<VictorsErrors>,
     pub duration: u128,
     // exception - should this be a Victor error or would it just be Err? How to attach backtrace?
 }
 
-impl<R: Clone + PartialEq + Serialize> Observation<R> {
+impl Observation {
     // TODO: pass in lambda/function block which is executed and duration/value returned
     pub fn new(
         name: String,
         experiment_name: String,
-        value: R,
-        cleaned_value: Option<R>,
+        value: Value,
+        cleaned_value: Option<Value>,
         duration: u128
     ) -> Self {
         return Self {
@@ -54,7 +55,7 @@ impl<R: Clone + PartialEq + Serialize> Observation<R> {
         f: F
     ) -> Self
     where
-        F: Fn() -> R
+        F: Fn() -> Value
     {
         let start = Instant::now();
         let value = f();
@@ -78,8 +79,8 @@ impl<R: Clone + PartialEq + Serialize> Observation<R> {
     /// Is this observation equivalent to another?
     pub fn equivalent_to(
         &self,
-        other: &Observation<R>,
-        comparator: Option<fn(a: &R, b: &R) -> bool>,
+        other: &Observation,
+        comparator: Option<fn(a: &Value, b: &Value) -> bool>,
         error_comparator: Option<fn(a: &String, b: &String) -> bool>,
     ) -> bool {
         // TODO: check raise // error

@@ -6,7 +6,7 @@ use crate::{errors::VictorsResult, experiment::{Experiment, UncontrolledExperime
 use crate::result_publisher::NoopPublisher;
 
 pub trait Scientist<'a, R: Clone + PartialEq + Serialize> {
-    type P: Publisher<R> + 'a;
+    type P: Publisher + 'a;
 
     /// Define and run a controlled experiment.
     ///
@@ -98,41 +98,41 @@ where
 
 }
 
-pub struct BoxedResultPublisher(Box<dyn Publisher<_> + Clone + PartialEq + Serialize>);
-impl BoxedResultPublisher {
-    pub(crate) fn new<T>(publisher: T) -> Self
-        where
-            T: Clone + PartialEq + Serialize + 'static,
-    {
-        BoxedResultPublisher(Box::new(publisher))
-    }
-}
-
-
-/// Represents the globally configured [`Publisher`] instance for this application.
-#[derive(Clone)]
-pub struct GlobalResultPublisherProvider {
-    publisher: Arc<BoxedResultPublisher>,
-}
-
-impl GlobalResultPublisherProvider {
-    /// Create a new GlobalResultPublisher instance from a struct that implements `Publisher`.
-    fn new<R, P>(publisher: P) -> Self
-        where
-            R: Clone + PartialEq + Serialize,
-            P: Publisher<R> + 'static,
-    {
-        GlobalResultPublisher {
-            publisher: Arc::new(publisher),
-        }
-    }
-}
-
-static GLOBAL_RESULT_PUBLISHER: once_cell::sync::Lazy<RwLock<GlobalResultPublisher>> = once_cell::sync::Lazy::new(|| {
-    RwLock::new(GlobalResultPublisher::new(
-        NoopPublisher{},
-    ))
-});
+// pub struct BoxedResultPublisher(Box<dyn Publisher>);
+// impl BoxedResultPublisher {
+//     pub(crate) fn new<T>(publisher: T) -> Self
+//         where
+//             T: Clone + PartialEq + Serialize + 'static,
+//     {
+//         BoxedResultPublisher(Box::new(publisher))
+//     }
+// }
+//
+//
+// /// Represents the globally configured [`Publisher`] instance for this application.
+// #[derive(Clone)]
+// pub struct GlobalResultPublisherProvider {
+//     publisher: Arc<BoxedResultPublisher>
+// }
+//
+// impl GlobalResultPublisherProvider {
+//     /// Create a new GlobalResultPublisher instance from a struct that implements `Publisher`.
+//     fn new<R, P>(publisher: P) -> Self
+//         where
+//             R: Clone + PartialEq + Serialize,
+//             P: Publisher + 'static
+//     {
+//         GlobalResultPublisherProvider {
+//             publisher: Arc::new(publisher)
+//         }
+//     }
+// }
+//
+// static GLOBAL_RESULT_PUBLISHER: once_cell::sync::Lazy<RwLock<GlobalResultPublisherProvider>> = once_cell::sync::Lazy::new(|| {
+//     RwLock::new(GlobalResultPublisherProvider::new(
+//         NoopPublisher{},
+//     ))
+// });
 
 
 
